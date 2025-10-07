@@ -31,7 +31,7 @@ Dit is een basis Python project template met een proper virtual environment conf
 
 5. Installeer de dependencies:
    ```bash
-   pip install -r metastudy/requirements.txt
+   pip install -r requirements.txt
    ```
 
 ## Gebruik
@@ -78,12 +78,21 @@ Zie [`CONFIGURATION_GUIDE.md`](CONFIGURATION_GUIDE.md) voor volledige documentat
 
 ```
 github-copilot-metastudy/
-├── venv/                 # Virtual environment
-├── metastudy/           # Hoofd applicatie directory
-│   ├── main.py         # Hoofd programma bestand
-│   └── requirements.txt # Project dependencies
-├── .gitignore          # Git ignore bestand
-└── README.md           # Dit bestand
+├── data/                    # Data opslag (NIET in git)
+│   ├── papers.db           # SQLite database met papers
+│   ├── pdf/                # Gedownloade PDFs
+│   └── md/                 # Geconverteerde Markdown bestanden
+├── src/                    # Hoofd package directory
+│   ├── arxiv/              # ArXiv API module
+│   ├── pdf/                # PDF processing module  
+│   ├── database/           # Database module
+│   ├── tests/              # Unit tests
+│   ├── config.py           # Configuratie
+│   └── main.py             # Package workflow
+├── main.py                 # Entry point
+├── requirements.txt        # Dependencies
+├── .gitignore             # Git ignore bestand
+└── README.md              # Dit bestand
 ```
 
 ## Development
