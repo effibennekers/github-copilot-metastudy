@@ -4,10 +4,16 @@ GitHub Copilot Metastudy - Hoofdmodule voor het onderzoeken van papers over GitH
 """
 
 import arxiv
+import time
 
 def search_copilot_papers():
-    """Zoek papers over GitHub Copilot op arXiv"""
+    """Zoek papers over GitHub Copilot op arXiv met rate limiting compliance"""
     print("Zoeken naar GitHub Copilot papers op arXiv...")
+    print("(Rate limiting: 3 seconden tussen requests)")
+    
+    # VERPLICHTE RATE LIMITING: 3 seconden wachten voor API request
+    # Bron: https://info.arxiv.org/help/api/tou.html
+    time.sleep(3)
     
     # Gebruik de nieuwe Client API in plaats van de deprecated Search.results()
     client = arxiv.Client()
