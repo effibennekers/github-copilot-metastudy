@@ -1,0 +1,181 @@
+# GitHub Copilot Metastudy Makefile
+# Maakt het mogelijk om pipeline stappen afzonderlijk uit te voeren
+
+# Variabelen
+PYTHON = python3
+VENV_DIR = venv
+VENV_PYTHON = $(VENV_DIR)/bin/python
+CLI_SCRIPT = cli.py
+
+# Kleuren voor output
+GREEN = \033[0;32m
+BLUE = \033[0;34m
+YELLOW = \033[0;33m
+RED = \033[0;31m
+NC = \033[0m # No Color
+
+# Default target
+.PHONY: help
+help:
+	@echo "$(BLUE)GitHub Copilot Metastudy Pipeline$(NC)"
+	@echo "=================================="
+	@echo ""
+	@echo "$(GREEN)Setup Commands:$(NC)"
+	@echo "  setup     - Installeer dependencies en setup virtual environment"
+	@echo "  clean     - Verwijder virtual environment en cache bestanden"
+	@echo ""
+	@echo "$(GREEN)Pipeline Commands:$(NC)"
+	@echo "  status    - Toon database statistieken"
+	@echo "  search    - Zoek en indexeer papers van arXiv"
+	@echo "  download  - Download PDFs voor geïndexeerde papers"
+	@echo "  convert   - Converteer PDFs naar Markdown"
+	@echo "  llm       - Voer LLM kwaliteitscontrole uit"
+	@echo "  pipeline  - Voer volledige pipeline uit (alle stappen)"
+	@echo ""
+	@echo "$(GREEN)Development Commands:$(NC)"
+	@echo "  test      - Voer unit tests uit"
+	@echo "  lint      - Voer code linting uit"
+	@echo "  format    - Formatteer code met black"
+	@echo ""
+	@echo "$(YELLOW)Examples:$(NC)"
+	@echo "  make setup     # Eenmalige setup"
+	@echo "  make status    # Check huidige status"
+	@echo "  make search    # Alleen nieuwe papers zoeken"
+	@echo "  make pipeline  # Volledige workflow"
+
+# Setup en installatie
+.PHONY: setup
+setup: $(VENV_DIR)/bin/activate
+	@echo "$(GREEN)✅ Setup completed successfully!$(NC)"
+	@echo "$(YELLOW)💡 Run 'make status' to check current database status$(NC)"
+
+$(VENV_DIR)/bin/activate: requirements.txt
+	@echo "$(BLUE)🔧 Setting up virtual environment...$(NC)"
+	$(PYTHON) -m venv $(VENV_DIR)
+	$(VENV_PYTHON) -m pip install --upgrade pip
+	$(VENV_PYTHON) -m pip install -r requirements.txt
+	@touch $(VENV_DIR)/bin/activate
+
+# Pipeline stappen
+.PHONY: status
+status: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)📊 Checking database status...$(NC)"
+	$(VENV_PYTHON) $(CLI_SCRIPT) status
+
+.PHONY: search
+search: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🔍 Starting paper search and indexing...$(NC)"
+	$(VENV_PYTHON) $(CLI_SCRIPT) search
+
+.PHONY: download
+download: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)⬇️  Starting PDF downloads...$(NC)"
+	$(VENV_PYTHON) $(CLI_SCRIPT) download
+
+.PHONY: convert
+convert: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)📝 Starting PDF to Markdown conversion...$(NC)"
+	$(VENV_PYTHON) $(CLI_SCRIPT) convert
+
+.PHONY: llm
+llm: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🤖 Starting LLM quality check...$(NC)"
+	@echo "$(YELLOW)💡 Note: LLM requires Ollama server running$(NC)"
+	$(VENV_PYTHON) $(CLI_SCRIPT) llm
+
+.PHONY: pipeline
+pipeline: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🚀 Starting complete pipeline...$(NC)"
+	$(VENV_PYTHON) $(CLI_SCRIPT) pipeline
+
+# Development commands
+.PHONY: test
+test: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🧪 Running unit tests...$(NC)"
+	$(VENV_PYTHON) -m pytest src/tests/ -v
+
+.PHONY: lint
+lint: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🔍 Running code linting...$(NC)"
+	$(VENV_PYTHON) -m flake8 src/ --max-line-length=100 --ignore=E203,W503
+
+.PHONY: format
+format: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)✨ Formatting code with black...$(NC)"
+	$(VENV_PYTHON) -m black src/ --line-length=100
+
+# Utility commands
+.PHONY: clean
+clean:
+	@echo "$(YELLOW)🧹 Cleaning up...$(NC)"
+	rm -rf $(VENV_DIR)
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -name "*.pyc" -delete 2>/dev/null || true
+	find . -name "*.pyo" -delete 2>/dev/null || true
+	find . -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(GREEN)✅ Cleanup completed$(NC)"
+
+.PHONY: install-ollama
+install-ollama:
+	@echo "$(BLUE)🤖 Installing Ollama...$(NC)"
+	@echo "$(YELLOW)💡 This will download and install Ollama locally$(NC)"
+	curl -fsSL https://ollama.ai/install.sh | sh
+	@echo "$(GREEN)✅ Ollama installed$(NC)"
+	@echo "$(YELLOW)💡 Run 'ollama pull llama3.2' to download the model$(NC)"
+
+.PHONY: setup-ollama
+setup-ollama:
+	@echo "$(BLUE)🤖 Setting up Ollama model...$(NC)"
+	ollama pull llama3.2
+	@echo "$(GREEN)✅ Ollama model ready$(NC)"
+	@echo "$(YELLOW)💡 Enable LLM in src/config.py: LLM_CONFIG['enabled'] = True$(NC)"
+
+# Debugging en monitoring
+.PHONY: logs
+logs:
+	@echo "$(BLUE)📋 Showing recent logs...$(NC)"
+	@if [ -f metastudy.log ]; then \
+		tail -50 metastudy.log; \
+	else \
+		echo "$(YELLOW)No log file found. Run a pipeline step first.$(NC)"; \
+	fi
+
+.PHONY: data-info
+data-info:
+	@echo "$(BLUE)📁 Data directory information:$(NC)"
+	@echo "Database:"
+	@ls -la data/*.db 2>/dev/null || echo "  No database files found"
+	@echo "PDFs:"
+	@ls -la data/pdf/ 2>/dev/null | wc -l | xargs -I {} echo "  {} PDF files"
+	@echo "Markdown:"
+	@ls -la data/md/ 2>/dev/null | wc -l | xargs -I {} echo "  {} Markdown files"
+
+# Combinatie targets voor workflows
+.PHONY: search-download
+search-download: search download
+
+.PHONY: download-convert
+download-convert: download convert
+
+.PHONY: convert-llm  
+convert-llm: convert llm
+
+.PHONY: full-processing
+full-processing: download convert llm
+
+# Safety checks
+.PHONY: check-ollama
+check-ollama:
+	@echo "$(BLUE)🔍 Checking Ollama status...$(NC)"
+	@if command -v ollama >/dev/null 2>&1; then \
+		echo "$(GREEN)✅ Ollama is installed$(NC)"; \
+		if pgrep -f ollama >/dev/null; then \
+			echo "$(GREEN)✅ Ollama service is running$(NC)"; \
+			ollama list 2>/dev/null || echo "$(YELLOW)⚠️  No models installed$(NC)"; \
+		else \
+			echo "$(YELLOW)⚠️  Ollama service is not running$(NC)"; \
+		fi \
+	else \
+		echo "$(RED)❌ Ollama is not installed$(NC)"; \
+		echo "$(YELLOW)💡 Run 'make install-ollama' to install$(NC)"; \
+	fi

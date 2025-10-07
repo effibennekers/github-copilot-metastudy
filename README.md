@@ -19,42 +19,68 @@ Dit is een basis Python project template met een proper virtual environment conf
    cd github-copilot-metastudy
    ```
 
-3. Maak een virtual environment aan (als nog niet gedaan):
+3. Voer de setup uit:
    ```bash
+   make setup
+   ```
+
+   Of handmatig:
+   ```bash
+   # Maak een virtual environment aan
    python3 -m venv venv
-   ```
-
-4. Activeer het virtual environment:
-   ```bash
+   
+   # Activeer het virtual environment
    source venv/bin/activate
-   ```
-
-5. Installeer de dependencies:
-   ```bash
+   
+   # Installeer dependencies
    pip install -r requirements.txt
    ```
 
 ## Gebruik
 
-### Basis Gebruik
+### Snelle Start
 
 ```bash
-# Activeer virtual environment
-source venv/bin/activate
+# Eenmalige setup
+make setup
 
-# Draai volledige pipeline
-python run.py
+# Check status
+make status
+
+# Volledige pipeline
+make pipeline
+```
+
+### Afzonderlijke Stappen
+
+```bash
+# Stap 1: Zoek nieuwe papers
+make search
+
+# Stap 2: Download PDFs  
+make download
+
+# Stap 3: Converteer naar Markdown
+make convert
+
+# Stap 4: LLM kwaliteitscontrole (optioneel)
+make llm
 ```
 
 ### LLM Kwaliteitscontrole (Optioneel)
 
 Voor automatische Markdown verbetering met Ollama:
 
-1. **Installeer Ollama**: [https://ollama.ai](https://ollama.ai)
-2. **Download een model**:
+1. **Installeer Ollama**:
    ```bash
-   ollama pull llama3.2
+   make install-ollama
    ```
+
+2. **Setup model**:
+   ```bash
+   make setup-ollama
+   ```
+
 3. **Schakel LLM in** in `src/config.py`:
    ```python
    LLM_CONFIG = {
@@ -63,6 +89,46 @@ Voor automatische Markdown verbetering met Ollama:
        # ... andere instellingen
    }
    ```
+
+4. **Run LLM stap**:
+   ```bash
+   make llm
+   ```
+
+### Alle Beschikbare Commando's
+
+```bash
+# Setup en cleanup
+make setup          # Installeer dependencies en setup virtual environment
+make clean          # Verwijder virtual environment en cache bestanden
+
+# Pipeline stappen
+make status          # Toon database statistieken
+make search          # Zoek en indexeer papers van arXiv
+make download        # Download PDFs voor geïndexeerde papers
+make convert         # Converteer PDFs naar Markdown
+make llm             # Voer LLM kwaliteitscontrole uit
+make pipeline        # Voer volledige pipeline uit (alle stappen)
+
+# Development
+make test            # Voer unit tests uit
+make lint            # Voer code linting uit
+make format          # Formatteer code met black
+
+# Ollama setup
+make install-ollama  # Installeer Ollama
+make setup-ollama    # Download en setup llama3.2 model
+make check-ollama    # Check Ollama status
+
+# Utilities
+make logs            # Toon recente logs
+make data-info       # Toon data directory informatie
+
+# Combinaties
+make search-download # Zoek en download in één keer
+make download-convert # Download en converteer in één keer
+make convert-llm     # Converteer en LLM check in één keer
+```
 
 ### Configuratie Aanpassen
 

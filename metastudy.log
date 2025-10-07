@@ -1607,3 +1607,8 @@ Pandoc can convert to PDF, but not from PDF.
 2025-10-07 23:53:05 - src.main - INFO - main:195 - === STAP 4: LLM Kwaliteitscontrole ===
 2025-10-07 23:53:05 - src.main - INFO - main:198 - LLM kwaliteitscontrole is uitgeschakeld in configuratie
 2025-10-07 23:53:05 - src.main - INFO - main:358 - 🎉 Pipeline completed successfully!
+2025-10-07 23:59:25 - src.database.models - INFO - models:54 - Database initialized: data/papers.db
+2025-10-07 23:59:25 - src.arxiv_client.client - INFO - client:25 - ArXiv Client initialized with 3s rate limiting
+2025-10-07 23:59:25 - src.pdf.processor - INFO - processor:31 - PDF Processor initialized - PDF: data/pdf, MD: data/md
+2025-10-07 23:59:25 - src.pdf.processor - INFO - processor:32 - Rate limiting: 3s between downloads
+2025-10-07 23:59:25 - src.llm.checker - INFO - checker:25 - LLM checker is disabled in configuration
