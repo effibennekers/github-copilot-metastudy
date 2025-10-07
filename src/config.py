@@ -121,31 +121,47 @@ LOGGING_CONFIG = {
     }
 }
 
-# LLM Configuration (Optioneel - voor toekomstige uitbreiding)
+# LLM Configuration (voor kwaliteitscontrole en analyse)
 LLM_CONFIG = {
-    "enabled": False,
-    "provider": "ollama",  # ollama, openai, anthropic
-    "model": "llama3.2",
-    "api_url": "http://localhost:11434",
-    "timeout_seconds": 120,
-    "max_retries": 2,
+    "enabled": False,                 # Schakel LLM kwaliteitscontrole in/uit
+    "provider": "ollama",             # ollama, openai, anthropic
+    "model_name": "llama3.2",         # Naam van het te gebruiken model
+    "ollama_api_base_url": "http://localhost:11434", # Ollama API endpoint
+    "timeout_seconds": 120,           # Timeout voor LLM requests
+    "max_retries": 2,                 # Max aantal pogingen bij failures
+    "retry_delay_seconds": 5,         # Wachttijd tussen pogingen
+    
+    # Processing settings
+    "max_tokens": 4000,               # Max tokens voor LLM response
+    "temperature": 0.1,               # Creativiteit van de LLM (laag voor consistentie)
+    "batch_size": 5,                  # Aantal papers per batch
+    "batch_delay_seconds": 10,        # Wachttijd tussen batches
     
     # Quality check prompts
-    "quality_check_prompt": """
-Je bent een expert in het controleren van academische papers die zijn geconverteerd van PDF naar Markdown.
+    "prompt_template": """Je bent een expert in het controleren van academische papers die zijn geconverteerd van PDF naar Markdown.
 
 Controleer de volgende Markdown tekst op:
-1. Verkeerde koppen (# ## ###)
-2. Gebroken tabellen  
-3. Foute lijstopmaak
-4. Referentie formatting
-5. Figuur/tabel captions
+1. Verkeerde koppen (# ## ###) - zorg dat ze logisch genest zijn
+2. Gebroken tabellen - herstel tabel formatting
+3. Foute lijstopmaak - corrigeer genummerde en bullet lists
+4. Referentie formatting - zorg voor correcte [1], [2] notatie
+5. Figuur/tabel captions - herstel "Figure 1:", "Table 2:" formatting
+6. Paragraaf structuur - voeg ontbrekende line breaks toe
+7. Code blocks - zorg voor correcte ``` formatting
+8. Mathematical formulas - behoud LaTeX notatie waar mogelijk
 
-Corrigeer de opmaak waar nodig en behoud alle originele inhoud.
-Antwoord ALLEEN met de gecorrigeerde Markdown, geen extra uitleg.
+BELANGRIJKE REGELS:
+- Behoud ALLE originele inhoud en betekenis
+- Verander GEEN wetenschappelijke termen of concepten
+- Voeg GEEN nieuwe informatie toe
+- Focus alleen op Markdown opmaak verbetering
+- Als de tekst al goed geformatteerd is, verander dan niets
 
-TEKST:
-""".strip()
+Antwoord ALLEEN met de gecorrigeerde Markdown, geen extra uitleg of commentaar.""",
+    
+    # Analysis prompts voor verschillende aspecten
+    "summary_prompt": "Maak een korte samenvatting van deze paper in het Nederlands:",
+    "keyword_extraction_prompt": "Extraheer de belangrijkste keywords uit deze paper:",
 }
 
 # User Interface Configuration

@@ -43,8 +43,26 @@ Dit is een basis Python project template met een proper virtual environment conf
 source venv/bin/activate
 
 # Draai volledige pipeline
-python src/main.py
+python run.py
 ```
+
+### LLM Kwaliteitscontrole (Optioneel)
+
+Voor automatische Markdown verbetering met Ollama:
+
+1. **Installeer Ollama**: [https://ollama.ai](https://ollama.ai)
+2. **Download een model**:
+   ```bash
+   ollama pull llama3.2
+   ```
+3. **Schakel LLM in** in `src/config.py`:
+   ```python
+   LLM_CONFIG = {
+       "enabled": True,  # Zet op True
+       "model_name": "llama3.2",
+       # ... andere instellingen
+   }
+   ```
 
 ### Configuratie Aanpassen
 
@@ -68,6 +86,12 @@ SEARCH_CONFIG = {
 - **Retry logic**: Maximum pogingen en delays
 - **PDF conversie**: Gebruikt pdfplumber voor betrouwbare tekstextractie
 
+#### 🤖 **LLM Kwaliteitscontrole** (Optioneel)
+- **Ollama integratie**: Lokale LLM voor Markdown verbetering
+- **Automatische formatting**: Herstelt koppen, tabellen, lijsten en referenties
+- **Batch processing**: Efficiënte verwerking van meerdere papers
+- **Backup systeem**: Bewaart originele bestanden voor rollback
+
 #### 📁 **Storage Configuratie**
 - **Directories**: PDF en Markdown opslag locaties
 - **Bestandsgroottes**: Min/max limieten voor validatie
@@ -83,13 +107,13 @@ github-copilot-metastudy/
 │   ├── pdf/                # Gedownloade PDFs
 │   └── md/                 # Geconverteerde Markdown bestanden
 ├── src/                    # Hoofd package directory
-│   ├── arxiv/              # ArXiv API module
-│   ├── pdf/                # PDF processing module  
-│   ├── database/           # Database module
-│   ├── logging/            # Logging setup module
-│   ├── tests/              # Unit tests
-│   ├── config.py           # Configuratie
-│   └── main.py             # Hoofd workflow
+│   ├── arxiv_client/       # 📡 ArXiv API client
+│   ├── pdf/                # 📄 PDF processing module  
+│   ├── database/           # 🗄️ Database module
+│   ├── llm/                # 🤖 LLM quality control
+│   ├── tests/              # 🧪 Unit tests
+│   ├── config.py           # ⚙️ Centralized configuratie
+│   └── main.py             # 🚀 Hoofd workflow
 ├── requirements.txt        # Dependencies
 ├── .gitignore             # Git ignore bestand
 └── README.md              # Dit bestand

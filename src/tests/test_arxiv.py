@@ -5,7 +5,7 @@ Unit tests voor ArXiv client module
 import unittest
 from unittest.mock import Mock, patch
 
-from ..arxiv import ArxivClient
+from ..arxiv_client import ArxivClient
 
 
 class TestArxivClient(unittest.TestCase):

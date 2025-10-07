@@ -13,12 +13,14 @@ from pathlib import Path
 from src.database import PaperDatabase
 from src.arxiv_client import ArxivClient
 from src.pdf import PDFProcessor
+from src.llm import LLMChecker
 from src.config import (
     SEARCH_CONFIG, 
     DATABASE_CONFIG, 
     STORAGE_CONFIG, 
     PROCESSING_CONFIG, 
     LOGGING_CONFIG,
+    LLM_CONFIG,
     UI_CONFIG
 )
 
@@ -188,6 +190,108 @@ def convert_to_markdown(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
     logger.info(f"STAP 3 VOLTOOID: {converted_count} conversions successful")
     return converted_count
 
+def llm_quality_check(db: PaperDatabase, llm_checker: LLMChecker, logger) -> int:
+    """Stap 4: LLM Kwaliteitscontrole van Markdown bestanden"""
+    logger.info("=== STAP 4: LLM Kwaliteitscontrole ===")
+    
+    if not llm_checker.is_enabled():
+        logger.info("LLM kwaliteitscontrole is uitgeschakeld in configuratie")
+        return 0
+    
+    # Check Ollama availability
+    if not llm_checker.check_ollama_availability():
+        logger.warning("Ollama server niet beschikbaar, LLM stap wordt overgeslagen")
+        return 0
+    
+    # Get papers that need LLM quality check
+    papers_to_check = db.get_papers_by_status(
+        download_status='DOWNLOADED',
+        llm_check_status='PENDING'
+    )
+    
+    if not papers_to_check:
+        logger.info("Geen papers voor LLM kwaliteitscontrole")
+        return 0
+    
+    logger.info(f"Te controleren papers: {len(papers_to_check)}")
+    
+    # Process papers in batches
+    batch_size = LLM_CONFIG.get('batch_size', 5)
+    batch_delay = LLM_CONFIG.get('batch_delay_seconds', 10)
+    
+    processed_count = 0
+    fixed_count = 0
+    failed_count = 0
+    
+    for i in range(0, len(papers_to_check), batch_size):
+        batch = papers_to_check[i:i + batch_size]
+        batch_num = (i // batch_size) + 1
+        total_batches = (len(papers_to_check) + batch_size - 1) // batch_size
+        
+        logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} papers)")
+        
+        for j, paper in enumerate(batch):
+            arxiv_id = paper['arxiv_id']
+            md_path = paper.get('md_path')
+            
+            if not md_path or not Path(md_path).exists():
+                logger.warning(f"No markdown file found for {arxiv_id}")
+                db.update_paper(arxiv_id, {'llm_check_status': 'FAILED'})
+                failed_count += 1
+                continue
+            
+            try:
+                logger.info(f"[{i+j+1}/{len(papers_to_check)}] LLM check: {arxiv_id}")
+                
+                # Read markdown content
+                with open(md_path, 'r', encoding='utf-8') as f:
+                    md_content = f.read()
+                
+                # Process with LLM
+                improved_content, status = llm_checker.check_and_fix_markdown(md_content, arxiv_id)
+                
+                # Save improved version if fixed
+                if status == 'FIXED':
+                    # Create backup first
+                    backup_path = Path(md_path).with_suffix('.md.backup')
+                    with open(backup_path, 'w', encoding='utf-8') as f:
+                        f.write(md_content)
+                    
+                    # Save improved version
+                    with open(md_path, 'w', encoding='utf-8') as f:
+                        f.write(improved_content)
+                    
+                    logger.info(f"✅ Improved and saved: {arxiv_id}")
+                    fixed_count += 1
+                elif status == 'CLEAN':
+                    logger.info(f"✅ Already clean: {arxiv_id}")
+                else:  # FAILED
+                    logger.warning(f"❌ LLM check failed: {arxiv_id}")
+                    failed_count += 1
+                
+                # Update database
+                db.update_paper(arxiv_id, {'llm_check_status': status})
+                processed_count += 1
+                
+            except Exception as e:
+                logger.error(f"Error processing {arxiv_id}: {e}")
+                db.update_paper(arxiv_id, {'llm_check_status': 'FAILED'})
+                failed_count += 1
+        
+        # Delay between batches (except for the last batch)
+        if i + batch_size < len(papers_to_check):
+            logger.info(f"Waiting {batch_delay}s before next batch...")
+            import time
+            time.sleep(batch_delay)
+    
+    logger.info(f"STAP 4 VOLTOOID: {processed_count} papers processed")
+    logger.info(f"  - Fixed: {fixed_count}")
+    logger.info(f"  - Clean: {processed_count - fixed_count - failed_count}")
+    logger.info(f"  - Failed: {failed_count}")
+    
+    return processed_count
+
+
 def main():
     """Hoofd workflow voor metastudy"""
     # Setup logging first
@@ -216,6 +320,7 @@ def main():
             STORAGE_CONFIG['pdf_directory'], 
             STORAGE_CONFIG['markdown_directory']
         )
+        llm_checker = LLMChecker()
         
         logger.info("✅ All components initialized successfully")
         
@@ -232,6 +337,9 @@ def main():
         # STAP 3: Convert naar Markdown
         conversions = convert_to_markdown(db, pdf_processor, logger)
         
+        # STAP 4: LLM Kwaliteitscontrole
+        llm_fixes = llm_quality_check(db, llm_checker, logger)
+        
         # Final statistics
         if UI_CONFIG.get('show_statistics', True):
             print_stats(db)
@@ -244,6 +352,7 @@ def main():
             print(f"🔍 Nieuwe papers gevonden: {new_papers}")
             print(f"⬇️  PDFs gedownload: {downloads}")
             print(f"📝 Markdown conversies: {conversions}")
+            print(f"🤖 LLM kwaliteitscontroles: {llm_fixes}")
             print("="*60)
         
         logger.info("🎉 Pipeline completed successfully!")

@@ -1511,3 +1511,99 @@ Pandoc can convert to PDF, but not from PDF.
 2025-10-07 23:40:24 - src.main - INFO - main:181 - ✅ Conversion successful: 2510.04796v1
 2025-10-07 23:40:24 - src.main - INFO - main:188 - STAP 3 VOLTOOID: 91 conversions successful
 2025-10-07 23:40:24 - src.main - INFO - main:249 - 🎉 Pipeline completed successfully!
+2025-10-07 23:52:38 - src.main - INFO - main:301 - 🚀 GitHub Copilot Metastudy - Pipeline Start
+2025-10-07 23:52:38 - src.main - INFO - main:302 - ======================================================================
+2025-10-07 23:52:38 - src.main - INFO - main:306 - Configuratie geladen:
+2025-10-07 23:52:38 - src.main - INFO - main:307 -   - Zoektermen: 10
+2025-10-07 23:52:38 - src.main - INFO - main:308 -   - Max per query: 20
+2025-10-07 23:52:38 - src.main - INFO - main:309 -   - Totaal max: 200
+2025-10-07 23:52:38 - src.main - INFO - main:310 -   - Database: data/papers.db
+2025-10-07 23:52:38 - src.main - INFO - main:311 -   - PDF directory: data/pdf
+2025-10-07 23:52:38 - src.main - INFO - main:312 -   - Markdown directory: data/md
+2025-10-07 23:52:38 - src.main - INFO - main:316 - Initializing components...
+2025-10-07 23:52:38 - src.database.models - INFO - models:54 - Database initialized: data/papers.db
+2025-10-07 23:52:38 - src.arxiv_client.client - INFO - client:25 - ArXiv Client initialized with 3s rate limiting
+2025-10-07 23:52:38 - src.pdf.processor - INFO - processor:31 - PDF Processor initialized - PDF: data/pdf, MD: data/md
+2025-10-07 23:52:38 - src.pdf.processor - INFO - processor:32 - Rate limiting: 3s between downloads
+2025-10-07 23:52:38 - src.llm.checker - INFO - checker:25 - LLM checker is disabled in configuration
+2025-10-07 23:52:38 - src.main - INFO - main:325 - ✅ All components initialized successfully
+2025-10-07 23:52:38 - src.main - INFO - main:50 - === STAP 1: Papers zoeken en indexeren ===
+2025-10-07 23:52:38 - src.main - INFO - main:58 - Configuratie: 10 zoektermen, max 20 per query
+2025-10-07 23:52:38 - src.main - INFO - main:59 - Totaal maximum papers: 200
+2025-10-07 23:52:38 - src.main - INFO - main:64 - [1/10] Zoeken met query: 'GitHub Copilot'
+2025-10-07 23:52:38 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'GitHub Copilot' (max: 20)
+2025-10-07 23:52:38 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:38 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:38 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:38 - src.main - INFO - main:90 - Query 'GitHub Copilot': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:38 - src.main - INFO - main:64 - [2/10] Zoeken met query: 'AI code generation'
+2025-10-07 23:52:38 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'AI code generation' (max: 20)
+2025-10-07 23:52:38 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.9 seconden
+2025-10-07 23:52:41 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:41 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:41 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:41 - src.main - INFO - main:90 - Query 'AI code generation': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:41 - src.main - INFO - main:64 - [3/10] Zoeken met query: 'programming assistant AI'
+2025-10-07 23:52:41 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'programming assistant AI' (max: 20)
+2025-10-07 23:52:41 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.9 seconden
+2025-10-07 23:52:44 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:44 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:44 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:44 - src.main - INFO - main:90 - Query 'programming assistant AI': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:44 - src.main - INFO - main:64 - [4/10] Zoeken met query: 'automated code completion'
+2025-10-07 23:52:44 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'automated code completion' (max: 20)
+2025-10-07 23:52:44 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.9 seconden
+2025-10-07 23:52:47 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:47 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:47 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:47 - src.main - INFO - main:90 - Query 'automated code completion': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:47 - src.main - INFO - main:64 - [5/10] Zoeken met query: 'copilot programming'
+2025-10-07 23:52:47 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'copilot programming' (max: 20)
+2025-10-07 23:52:47 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.8 seconden
+2025-10-07 23:52:50 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:50 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:50 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:50 - src.main - INFO - main:90 - Query 'copilot programming': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:50 - src.main - INFO - main:64 - [6/10] Zoeken met query: 'AI pair programming'
+2025-10-07 23:52:50 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'AI pair programming' (max: 20)
+2025-10-07 23:52:50 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.8 seconden
+2025-10-07 23:52:53 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:53 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:53 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:53 - src.main - INFO - main:90 - Query 'AI pair programming': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:53 - src.main - INFO - main:64 - [7/10] Zoeken met query: 'code completion AI'
+2025-10-07 23:52:53 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'code completion AI' (max: 20)
+2025-10-07 23:52:53 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.8 seconden
+2025-10-07 23:52:56 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:56 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:56 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:56 - src.main - INFO - main:90 - Query 'code completion AI': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:56 - src.main - INFO - main:64 - [8/10] Zoeken met query: 'intelligent code assistance'
+2025-10-07 23:52:56 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'intelligent code assistance' (max: 20)
+2025-10-07 23:52:56 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.8 seconden
+2025-10-07 23:52:59 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:52:59 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:52:59 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:52:59 - src.main - INFO - main:90 - Query 'intelligent code assistance': 0 nieuwe papers toegevoegd
+2025-10-07 23:52:59 - src.main - INFO - main:64 - [9/10] Zoeken met query: 'LLM code generation'
+2025-10-07 23:52:59 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'LLM code generation' (max: 20)
+2025-10-07 23:52:59 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.8 seconden
+2025-10-07 23:53:02 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:53:02 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:53:02 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:53:02 - src.main - INFO - main:90 - Query 'LLM code generation': 0 nieuwe papers toegevoegd
+2025-10-07 23:53:02 - src.main - INFO - main:64 - [10/10] Zoeken met query: 'neural code completion'
+2025-10-07 23:53:02 - src.arxiv_client.client - INFO - client:46 - Zoeken naar papers: 'neural code completion' (max: 20)
+2025-10-07 23:53:02 - src.arxiv_client.client - INFO - client:37 - Rate limiting: wachten 2.8 seconden
+2025-10-07 23:53:05 - src.arxiv_client.client - INFO - client:79 - Verwerkt 10 papers...
+2025-10-07 23:53:05 - src.arxiv_client.client - INFO - client:79 - Verwerkt 20 papers...
+2025-10-07 23:53:05 - src.arxiv_client.client - INFO - client:81 - Totaal gevonden papers: 20
+2025-10-07 23:53:05 - src.main - INFO - main:90 - Query 'neural code completion': 0 nieuwe papers toegevoegd
+2025-10-07 23:53:05 - src.main - INFO - main:97 - STAP 1 VOLTOOID: Totaal 0 nieuwe papers toegevoegd
+2025-10-07 23:53:05 - src.main - INFO - main:102 - === STAP 2: PDFs downloaden ===
+2025-10-07 23:53:05 - src.main - INFO - main:107 - Geen PDFs om te downloaden
+2025-10-07 23:53:05 - src.main - INFO - main:153 - === STAP 3: PDF naar Markdown conversie ===
+2025-10-07 23:53:05 - src.main - INFO - main:161 - Geen PDFs om te converteren
+2025-10-07 23:53:05 - src.main - INFO - main:195 - === STAP 4: LLM Kwaliteitscontrole ===
+2025-10-07 23:53:05 - src.main - INFO - main:198 - LLM kwaliteitscontrole is uitgeschakeld in configuratie
+2025-10-07 23:53:05 - src.main - INFO - main:358 - 🎉 Pipeline completed successfully!
