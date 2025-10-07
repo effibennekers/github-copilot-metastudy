@@ -6,19 +6,19 @@ Handles PDF download en conversie naar Markdown
 import requests
 import time
 import subprocess
-import logging
 from pathlib import Path
 from typing import Optional
 import hashlib
 
 # Import configuratie
 from ..config import STORAGE_CONFIG, PROCESSING_CONFIG
+from ..logging import get_logger
 
 class PDFProcessor:
     def __init__(self, pdf_dir: str = None, md_dir: str = None):
         self.pdf_dir = Path(pdf_dir or STORAGE_CONFIG['pdf_directory'])
         self.md_dir = Path(md_dir or STORAGE_CONFIG['markdown_directory'])
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.last_download_time = 0
         
         # Load processing configuration

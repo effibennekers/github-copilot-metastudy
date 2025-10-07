@@ -62,7 +62,7 @@ PROCESSING_CONFIG = {
     "download_rate_limit_seconds": 3,
     
     # Retry configuratie
-    "max_retries": 3,
+    "max_retries": 2,
     "retry_delay_seconds": 5,
     
     # Timeout configuratie  

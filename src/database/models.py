@@ -5,18 +5,18 @@ Beheert SQLite database voor paper metadata en status tracking
 
 import sqlite3
 import json
-import logging
 from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
 
 # Import configuratie
 from ..config import DATABASE_CONFIG, STORAGE_CONFIG
+from ..logging import get_logger
 
 class PaperDatabase:
     def __init__(self, db_path: str = None):
         self.db_path = db_path or DATABASE_CONFIG['db_path']
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         
         # Ensure data directory exists
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)

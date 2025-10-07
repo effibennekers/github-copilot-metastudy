@@ -5,16 +5,16 @@ Implementeert rate limiting compliance volgens arXiv Terms of Use
 
 import arxiv
 import time
-import logging
 from typing import List, Dict
 
 # Import configuratie
 from ..config import PROCESSING_CONFIG
+from ..logging import get_logger
 
 class ArxivClient:
     def __init__(self):
         self.client = arxiv.Client()
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.last_request_time = 0
         
         # Load processing configuration

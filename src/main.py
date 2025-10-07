@@ -4,7 +4,6 @@ GitHub Copilot Metastudy - Hoofdworkflow
 Uitgebreide pipeline voor paper downloading, conversie en analyse
 """
 
-import logging
 import sys
 from pathlib import Path
 
@@ -12,44 +11,21 @@ from pathlib import Path
 from .database import PaperDatabase
 from .arxiv import ArxivClient
 from .pdf import PDFProcessor
+from .logging import setup_logging, get_logger
 from .config import (
     SEARCH_CONFIG, 
     DATABASE_CONFIG, 
     STORAGE_CONFIG, 
     PROCESSING_CONFIG, 
-    LOGGING_CONFIG,
     UI_CONFIG
 )
-
-def setup_logging():
-    """Setup logging configuratie uit config"""
-    log_config = LOGGING_CONFIG
-    
-    handlers = []
-    
-    # Console handler
-    if log_config.get('console_enabled', True):
-        handlers.append(logging.StreamHandler())
-    
-    # File handler
-    if log_config.get('file_enabled', True):
-        from logging.handlers import RotatingFileHandler
-        file_handler = RotatingFileHandler(
-            log_config.get('file_path', 'metastudy.log'),
-            maxBytes=log_config.get('max_file_size_mb', 10) * 1024 * 1024,
-            backupCount=log_config.get('backup_count', 5)
-        )
-        handlers.append(file_handler)
-    
-    logging.basicConfig(
-        level=getattr(logging, log_config.get('level', 'INFO')),
-        format=log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
-        handlers=handlers
-    )
 
 def print_stats(db: PaperDatabase):
     """Print database statistieken"""
     stats = db.get_statistics()
+    
+    if not UI_CONFIG.get('show_statistics', True):
+        return
     
     print("\n" + "="*60)
     print("DATABASE STATISTIEKEN")
@@ -65,7 +41,7 @@ def print_stats(db: PaperDatabase):
         print(f"  {status}: {count}")
     print("="*60)
 
-def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger: logging.Logger):
+def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger):
     """STAP 1: Zoek en indexeer papers"""
     logger.info("=== STAP 1: Papers zoeken en indexeren ===")
     
@@ -117,7 +93,7 @@ def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger
     logger.info(f"STAP 1 VOLTOOID: Totaal {total_new_papers} nieuwe papers toegevoegd")
     return total_new_papers
 
-def download_pdfs(db: PaperDatabase, pdf_processor: PDFProcessor, logger: logging.Logger):
+def download_pdfs(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
     """STAP 2: Download PDFs"""
     logger.info("=== STAP 2: PDFs downloaden ===")
     
@@ -168,7 +144,7 @@ def download_pdfs(db: PaperDatabase, pdf_processor: PDFProcessor, logger: loggin
     logger.info(f"STAP 2 VOLTOOID: {downloaded_count} downloads successful, {failed_count} failed")
     return downloaded_count
 
-def convert_to_markdown(db: PaperDatabase, pdf_processor: PDFProcessor, logger: logging.Logger):
+def convert_to_markdown(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
     """STAP 3: Convert naar Markdown"""
     logger.info("=== STAP 3: PDF naar Markdown conversie ===")
     
@@ -212,8 +188,9 @@ def convert_to_markdown(db: PaperDatabase, pdf_processor: PDFProcessor, logger: 
 
 def main():
     """Hoofd workflow voor metastudy"""
+    # Setup logging first
     setup_logging()
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     
     logger.info("🚀 GitHub Copilot Metastudy - Pipeline Start")
     logger.info("=" * 70)
