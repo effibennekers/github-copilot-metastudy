@@ -68,25 +68,57 @@ PROCESSING_CONFIG = {
     # Timeout configuratie  
     "api_timeout_seconds": 30,
     "download_timeout_seconds": 60,
-    "conversion_timeout_seconds": 120,
-    
-    # Conversion preferences
-    "prefer_pandoc": True,  # Probeer pandoc eerst, fallback naar pdfplumber
-    "pandoc_options": ["--wrap=none", "--extract-media=."],
+    "conversion_timeout_seconds": 120, # Timeout voor PDF naar Markdown conversie
     
     # Parallel processing (LET OP: Rate limiting moet gerespecteerd worden!)
     "max_concurrent_downloads": 1,  # MOET 1 blijven voor arXiv compliance
 }
 
-# Logging Configuration
+# ==============================================================================
+# LOGGING CONFIGURATION
+# Python's standaard logging configuratie (logging.config.dictConfig format)
+# ==============================================================================
 LOGGING_CONFIG = {
-    "level": "INFO",  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    "file_enabled": True,
-    "file_path": "metastudy.log",
-    "console_enabled": True,
-    "max_file_size_mb": 10,
-    "backup_count": 5
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+        'detailed': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO',
+            'formatter': 'standard',
+            'stream': 'ext://sys.stdout'
+        },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'level': 'INFO',
+            'formatter': 'detailed',
+            'filename': 'metastudy.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'encoding': 'utf-8'
+        }
+    },
+    'loggers': {
+        'src': {  # Our package logger
+            'level': 'INFO',
+            'handlers': ['console', 'file'],
+            'propagate': False
+        }
+    },
+    'root': {
+        'level': 'WARNING',  # Only show warnings/errors from other libraries
+        'handlers': ['console']
+    }
 }
 
 # LLM Configuration (Optioneel - voor toekomstige uitbreiding)

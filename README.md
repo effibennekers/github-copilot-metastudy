@@ -65,8 +65,8 @@ SEARCH_CONFIG = {
 
 #### ⚙️ **Processing Instellingen**
 - **Rate limiting**: API en download timeouts (min 3s voor arXiv compliance)
-- **Retry logic**: Maximum pogingen en delays  
-- **Conversie opties**: Pandoc vs pdfplumber preferences
+- **Retry logic**: Maximum pogingen en delays
+- **PDF conversie**: Gebruikt pdfplumber voor betrouwbare tekstextractie
 
 #### 📁 **Storage Configuratie**
 - **Directories**: PDF en Markdown opslag locaties
@@ -86,6 +86,7 @@ github-copilot-metastudy/
 │   ├── arxiv/              # ArXiv API module
 │   ├── pdf/                # PDF processing module  
 │   ├── database/           # Database module
+│   ├── logging/            # Logging setup module
 │   ├── tests/              # Unit tests
 │   ├── config.py           # Configuratie
 │   └── main.py             # Hoofd workflow

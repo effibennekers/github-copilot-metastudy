@@ -4,19 +4,21 @@ GitHub Copilot Metastudy - Hoofdworkflow
 Uitgebreide pipeline voor paper downloading, conversie en analyse
 """
 
+import logging
+import logging.config
 import sys
 from pathlib import Path
 
 # Import from package modules
-from .database import PaperDatabase
-from .arxiv import ArxivClient
-from .pdf import PDFProcessor
-from .logging import setup_logging, get_logger
-from .config import (
+from src.database import PaperDatabase
+from src.arxiv_client import ArxivClient
+from src.pdf import PDFProcessor
+from src.config import (
     SEARCH_CONFIG, 
     DATABASE_CONFIG, 
     STORAGE_CONFIG, 
     PROCESSING_CONFIG, 
+    LOGGING_CONFIG,
     UI_CONFIG
 )
 
@@ -189,8 +191,8 @@ def convert_to_markdown(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
 def main():
     """Hoofd workflow voor metastudy"""
     # Setup logging first
-    setup_logging()
-    logger = get_logger(__name__)
+    logging.config.dictConfig(LOGGING_CONFIG)
+    logger = logging.getLogger(__name__)
     
     logger.info("🚀 GitHub Copilot Metastudy - Pipeline Start")
     logger.info("=" * 70)

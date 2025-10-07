@@ -5,20 +5,19 @@ Handles PDF download en conversie naar Markdown
 
 import requests
 import time
-import subprocess
+import logging
 from pathlib import Path
 from typing import Optional
 import hashlib
 
 # Import configuratie
-from ..config import STORAGE_CONFIG, PROCESSING_CONFIG
-from ..logging import get_logger
+from src.config import STORAGE_CONFIG, PROCESSING_CONFIG
 
 class PDFProcessor:
     def __init__(self, pdf_dir: str = None, md_dir: str = None):
         self.pdf_dir = Path(pdf_dir or STORAGE_CONFIG['pdf_directory'])
         self.md_dir = Path(md_dir or STORAGE_CONFIG['markdown_directory'])
-        self.logger = get_logger(__name__)
+        self.logger = logging.getLogger(__name__)
         self.last_download_time = 0
         
         # Load processing configuration
@@ -117,83 +116,36 @@ class PDFProcessor:
             return None
     
     def pdf_to_markdown(self, pdf_path: str, arxiv_id: str) -> Optional[str]:
-        """Convert PDF to Markdown using pandoc"""
-        md_path = self.md_dir / f"{arxiv_id}.md" 
-        
+        """Convert PDF to Markdown using pdfplumber"""
+        md_path = self.md_dir / f"{arxiv_id}.md"
+
         # Check if Markdown already exists
         if md_path.exists():
             file_size = md_path.stat().st_size
             min_size = self.storage_config['min_markdown_size_bytes']
-            
+
             if file_size >= min_size:
                 self.logger.info(f"Markdown already exists: {md_path} ({file_size} bytes)")
                 return str(md_path)
             else:
                 self.logger.warning(f"Existing markdown too small, reconverting: {md_path}")
                 md_path.unlink()
-        
+
         # Check if source PDF exists
         if not Path(pdf_path).exists():
             self.logger.error(f"Source PDF not found: {pdf_path}")
             return None
-        
+
         try:
             self.logger.info(f"Converting PDF to Markdown: {arxiv_id}")
-            
-            # Try pandoc first if preferred and available
-            if self.processing_config.get('prefer_pandoc', True) and self._has_pandoc():
-                return self._convert_with_pandoc(pdf_path, md_path, arxiv_id)
-            else:
-                # Fallback to pdfplumber
-                self.logger.warning("Using pdfplumber for conversion")
-                return self._convert_with_pdfplumber(pdf_path, md_path, arxiv_id)
-                
+            return self._convert_with_pdfplumber(pdf_path, md_path, arxiv_id)
+
         except Exception as e:
             self.logger.error(f"PDF to Markdown conversion failed for {arxiv_id}: {e}")
             return None
     
-    def _has_pandoc(self) -> bool:
-        """Check if pandoc is available"""
-        try:
-            result = subprocess.run(['pandoc', '--version'], 
-                                  capture_output=True, 
-                                  text=True, 
-                                  timeout=10)
-            return result.returncode == 0
-        except (subprocess.SubprocessError, FileNotFoundError):
-            return False
-    
-    def _convert_with_pandoc(self, pdf_path: str, md_path: Path, arxiv_id: str) -> Optional[str]:
-        """Convert PDF using pandoc"""
-        try:
-            # Get pandoc options from config
-            pandoc_options = self.processing_config.get('pandoc_options', ["--wrap=none", "--extract-media=."])
-            
-            cmd = ['pandoc', pdf_path, '-o', str(md_path)] + pandoc_options + ['-t', 'markdown']
-            
-            timeout = self.processing_config['conversion_timeout_seconds']
-            result = subprocess.run(cmd, 
-                                  capture_output=True, 
-                                  text=True, 
-                                  timeout=timeout)
-            
-            if result.returncode == 0 and md_path.exists():
-                file_size = md_path.stat().st_size
-                self.logger.info(f"Pandoc conversion successful: {md_path} ({file_size} bytes)")
-                return str(md_path)
-            else:
-                self.logger.error(f"Pandoc conversion failed: {result.stderr}")
-                return None
-                
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Pandoc conversion timeout for {arxiv_id}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Pandoc conversion error: {e}")
-            return None
-    
     def _convert_with_pdfplumber(self, pdf_path: str, md_path: Path, arxiv_id: str) -> Optional[str]:
-        """Fallback conversion using pdfplumber"""
+        """Convert PDF to Markdown using pdfplumber"""
         try:
             import pdfplumber
             
