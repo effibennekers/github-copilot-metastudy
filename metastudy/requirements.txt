@@ -1,5 +1,6 @@
 # Basis dependencies voor het Python project
-# Voeg hier je project dependencies toe
+# ArXiv API voor het ophalen van wetenschappelijke papers
+arxiv>=1.4.0
 
 # Development dependencies
 pytest>=7.0.0
