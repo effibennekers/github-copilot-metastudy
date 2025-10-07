@@ -1,0 +1,7 @@
+# Basis dependencies voor het Python project
+# Voeg hier je project dependencies toe
+
+# Development dependencies
+pytest>=7.0.0
+black>=22.0.0
+flake8>=4.0.0
