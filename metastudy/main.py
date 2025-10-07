@@ -14,16 +14,39 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from database import PaperDatabase
 from arxiv_client import ArxivClient
 from pdf_processor import PDFProcessor
+from config import (
+    SEARCH_CONFIG, 
+    DATABASE_CONFIG, 
+    STORAGE_CONFIG, 
+    PROCESSING_CONFIG, 
+    LOGGING_CONFIG,
+    UI_CONFIG
+)
 
 def setup_logging():
-    """Setup logging configuratie"""
+    """Setup logging configuratie uit config"""
+    log_config = LOGGING_CONFIG
+    
+    handlers = []
+    
+    # Console handler
+    if log_config.get('console_enabled', True):
+        handlers.append(logging.StreamHandler())
+    
+    # File handler
+    if log_config.get('file_enabled', True):
+        from logging.handlers import RotatingFileHandler
+        file_handler = RotatingFileHandler(
+            log_config.get('file_path', 'metastudy.log'),
+            maxBytes=log_config.get('max_file_size_mb', 10) * 1024 * 1024,
+            backupCount=log_config.get('backup_count', 5)
+        )
+        handlers.append(file_handler)
+    
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('metastudy.log'),
-            logging.StreamHandler()
-        ]
+        level=getattr(logging, log_config.get('level', 'INFO')),
+        format=log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
+        handlers=handlers
     )
 
 def print_stats(db: PaperDatabase):
@@ -48,23 +71,31 @@ def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger
     """STAP 1: Zoek en indexeer papers"""
     logger.info("=== STAP 1: Papers zoeken en indexeren ===")
     
-    # Multiple search queries for comprehensive coverage
-    queries = [
-        "GitHub Copilot",
-        "AI code generation",
-        "programming assistant AI",
-        "automated code completion",
-        "copilot programming",
-        "AI pair programming"
-    ]
+    # Haal configuratie op
+    search_config = SEARCH_CONFIG
+    queries = search_config['queries']
+    max_results_per_query = search_config['max_results_per_query']
+    total_max_papers = search_config['total_max_papers']
+    
+    logger.info(f"Configuratie: {len(queries)} zoektermen, max {max_results_per_query} per query")
+    logger.info(f"Totaal maximum papers: {total_max_papers}")
     
     total_new_papers = 0
     
-    for query in queries:
-        logger.info(f"Zoeken met query: '{query}'")
+    for i, query in enumerate(queries, 1):
+        logger.info(f"[{i}/{len(queries)}] Zoeken met query: '{query}'")
+        
+        # Check of we het totaal maximum hebben bereikt
+        if total_new_papers >= total_max_papers:
+            logger.info(f"Maximum aantal papers bereikt ({total_max_papers}), stoppen met zoeken")
+            break
         
         try:
-            papers = arxiv_client.search_papers(query, max_results=20)
+            # Bereken hoeveel papers we nog kunnen ophalen
+            remaining_quota = total_max_papers - total_new_papers
+            current_max = min(max_results_per_query, remaining_quota)
+            
+            papers = arxiv_client.search_papers(query, max_results=current_max)
             
             new_papers = 0
             for paper in papers:
@@ -72,6 +103,11 @@ def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger
                     db.insert_paper(paper)
                     new_papers += 1
                     logger.info(f"Nieuw paper toegevoegd: {paper['arxiv_id']} - {paper['title'][:50]}...")
+                    
+                    # Check quota again
+                    if total_new_papers + new_papers >= total_max_papers:
+                        logger.info(f"Maximum papers quota bereikt tijdens verwerking")
+                        break
             
             logger.info(f"Query '{query}': {new_papers} nieuwe papers toegevoegd")
             total_new_papers += new_papers
@@ -184,17 +220,31 @@ def main():
     logger.info("🚀 GitHub Copilot Metastudy - Pipeline Start")
     logger.info("=" * 70)
     
+    # Log configuratie
+    search_config = SEARCH_CONFIG
+    logger.info(f"Configuratie geladen:")
+    logger.info(f"  - Zoektermen: {len(search_config['queries'])}")
+    logger.info(f"  - Max per query: {search_config['max_results_per_query']}")
+    logger.info(f"  - Totaal max: {search_config['total_max_papers']}")
+    logger.info(f"  - Database: {DATABASE_CONFIG['db_path']}")
+    logger.info(f"  - PDF directory: {STORAGE_CONFIG['pdf_directory']}")
+    logger.info(f"  - Markdown directory: {STORAGE_CONFIG['markdown_directory']}")
+    
     try:
-        # Initialize components
+        # Initialize components met configuratie
         logger.info("Initializing components...")
-        db = PaperDatabase()
+        db = PaperDatabase(DATABASE_CONFIG['db_path'])
         arxiv_client = ArxivClient()
-        pdf_processor = PDFProcessor()
+        pdf_processor = PDFProcessor(
+            STORAGE_CONFIG['pdf_directory'], 
+            STORAGE_CONFIG['markdown_directory']
+        )
         
         logger.info("✅ All components initialized successfully")
         
         # Show initial stats
-        print_stats(db)
+        if UI_CONFIG.get('show_statistics', True):
+            print_stats(db)
         
         # STAP 1: Zoek en indexeer papers
         new_papers = search_and_index_papers(db, arxiv_client, logger)
@@ -206,16 +256,18 @@ def main():
         conversions = convert_to_markdown(db, pdf_processor, logger)
         
         # Final statistics
-        print_stats(db)
+        if UI_CONFIG.get('show_statistics', True):
+            print_stats(db)
         
         # Summary
-        print("\n" + "="*60)
-        print("PIPELINE SUMMARY")
-        print("="*60)
-        print(f"🔍 Nieuwe papers gevonden: {new_papers}")
-        print(f"⬇️  PDFs gedownload: {downloads}")
-        print(f"📝 Markdown conversies: {conversions}")
-        print("="*60)
+        if UI_CONFIG.get('show_progress_bars', True):
+            print("\n" + "="*60)
+            print("PIPELINE SUMMARY")
+            print("="*60)
+            print(f"🔍 Nieuwe papers gevonden: {new_papers}")
+            print(f"⬇️  PDFs gedownload: {downloads}")
+            print(f"📝 Markdown conversies: {conversions}")
+            print("="*60)
         
         logger.info("🎉 Pipeline completed successfully!")
         

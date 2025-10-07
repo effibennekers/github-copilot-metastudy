@@ -10,13 +10,18 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
 
+# Import configuratie
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from config import DATABASE_CONFIG, STORAGE_CONFIG
+
 class PaperDatabase:
-    def __init__(self, db_path: str = "data/papers.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or DATABASE_CONFIG['db_path']
         self.logger = logging.getLogger(__name__)
         
         # Ensure data directory exists
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         
         self.init_database()
     

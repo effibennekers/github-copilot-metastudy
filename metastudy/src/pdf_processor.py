@@ -11,29 +11,40 @@ from pathlib import Path
 from typing import Optional
 import hashlib
 
+# Import configuratie
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from config import STORAGE_CONFIG, PROCESSING_CONFIG
+
 class PDFProcessor:
-    def __init__(self, pdf_dir: str = "data/pdf", md_dir: str = "data/md"):
-        self.pdf_dir = Path(pdf_dir)
-        self.md_dir = Path(md_dir)
+    def __init__(self, pdf_dir: str = None, md_dir: str = None):
+        self.pdf_dir = Path(pdf_dir or STORAGE_CONFIG['pdf_directory'])
+        self.md_dir = Path(md_dir or STORAGE_CONFIG['markdown_directory'])
         self.logger = logging.getLogger(__name__)
         self.last_download_time = 0
+        
+        # Load processing configuration
+        self.processing_config = PROCESSING_CONFIG
+        self.storage_config = STORAGE_CONFIG
         
         # Ensure directories exist
         self.pdf_dir.mkdir(parents=True, exist_ok=True)
         self.md_dir.mkdir(parents=True, exist_ok=True)
         
         self.logger.info(f"PDF Processor initialized - PDF: {self.pdf_dir}, MD: {self.md_dir}")
+        self.logger.info(f"Rate limiting: {self.processing_config['download_rate_limit_seconds']}s between downloads")
     
     def _enforce_download_rate_limit(self):
         """
-        VERPLICHTE RATE LIMITING: 3 seconden tussen downloads
+        VERPLICHTE RATE LIMITING: configureerbare seconden tussen downloads
         Bron: https://info.arxiv.org/help/api/tou.html
         """
+        rate_limit = self.processing_config['download_rate_limit_seconds']
         current_time = time.time()
         time_since_last = current_time - self.last_download_time
         
-        if time_since_last < 3.0:
-            sleep_time = 3.0 - time_since_last
+        if time_since_last < rate_limit:
+            sleep_time = rate_limit - time_since_last
             self.logger.info(f"Download rate limiting: wachten {sleep_time:.1f} seconden")
             time.sleep(sleep_time)
         
@@ -49,12 +60,15 @@ class PDFProcessor:
         # Check if PDF already exists
         if pdf_path.exists():
             file_size = pdf_path.stat().st_size
-            if file_size > 1000:  # Minimum reasonable file size (1KB)
+            min_size = self.storage_config['min_pdf_size_kb'] * 1024
+            max_size = self.storage_config['max_pdf_size_mb'] * 1024 * 1024
+            
+            if min_size <= file_size <= max_size:
                 self.logger.info(f"PDF already exists: {pdf_path} ({file_size} bytes)")
                 return str(pdf_path)
             else:
-                self.logger.warning(f"Existing PDF too small, re-downloading: {pdf_path}")
-                pdf_path.unlink()  # Remove corrupted file
+                self.logger.warning(f"Existing PDF size invalid ({file_size} bytes), re-downloading: {pdf_path}")
+                pdf_path.unlink()  # Remove invalid file
         
         try:
             # VERPLICHTE RATE LIMITING
@@ -67,7 +81,8 @@ class PDFProcessor:
                 'User-Agent': 'GitHub-Copilot-Metastudy/1.0 (research paper analysis)'
             }
             
-            response = requests.get(pdf_url, headers=headers, timeout=60, stream=True)
+            timeout = self.processing_config['download_timeout_seconds']
+            response = requests.get(pdf_url, headers=headers, timeout=timeout, stream=True)
             response.raise_for_status()
             
             # Check if response is actually a PDF
@@ -83,11 +98,15 @@ class PDFProcessor:
                         f.write(chunk)
             
             # Verify file was written and has reasonable size
-            if pdf_path.exists() and pdf_path.stat().st_size > 1000:
+            min_size = self.storage_config['min_pdf_size_kb'] * 1024
+            max_size = self.storage_config['max_pdf_size_mb'] * 1024 * 1024
+            
+            if pdf_path.exists() and min_size <= pdf_path.stat().st_size <= max_size:
                 self.logger.info(f"PDF downloaded successfully: {pdf_path} ({pdf_path.stat().st_size} bytes)")
                 return str(pdf_path)
             else:
-                self.logger.error(f"PDF download failed or file too small: {pdf_path}")
+                size = pdf_path.stat().st_size if pdf_path.exists() else 0
+                self.logger.error(f"PDF download failed or invalid size: {pdf_path} ({size} bytes)")
                 if pdf_path.exists():
                     pdf_path.unlink()
                 return None
@@ -106,7 +125,9 @@ class PDFProcessor:
         # Check if Markdown already exists
         if md_path.exists():
             file_size = md_path.stat().st_size
-            if file_size > 100:  # Minimum reasonable markdown size
+            min_size = self.storage_config['min_markdown_size_bytes']
+            
+            if file_size >= min_size:
                 self.logger.info(f"Markdown already exists: {md_path} ({file_size} bytes)")
                 return str(md_path)
             else:
@@ -121,12 +142,12 @@ class PDFProcessor:
         try:
             self.logger.info(f"Converting PDF to Markdown: {arxiv_id}")
             
-            # Try pandoc first (preferred method)
-            if self._has_pandoc():
+            # Try pandoc first if preferred and available
+            if self.processing_config.get('prefer_pandoc', True) and self._has_pandoc():
                 return self._convert_with_pandoc(pdf_path, md_path, arxiv_id)
             else:
                 # Fallback to pdfplumber
-                self.logger.warning("Pandoc not available, using pdfplumber fallback")
+                self.logger.warning("Using pdfplumber for conversion")
                 return self._convert_with_pdfplumber(pdf_path, md_path, arxiv_id)
                 
         except Exception as e:
@@ -147,19 +168,16 @@ class PDFProcessor:
     def _convert_with_pandoc(self, pdf_path: str, md_path: Path, arxiv_id: str) -> Optional[str]:
         """Convert PDF using pandoc"""
         try:
-            cmd = [
-                'pandoc',
-                pdf_path,
-                '-o', str(md_path),
-                '--wrap=none',
-                '--extract-media=.',
-                '-t', 'markdown'
-            ]
+            # Get pandoc options from config
+            pandoc_options = self.processing_config.get('pandoc_options', ["--wrap=none", "--extract-media=."])
             
+            cmd = ['pandoc', pdf_path, '-o', str(md_path)] + pandoc_options + ['-t', 'markdown']
+            
+            timeout = self.processing_config['conversion_timeout_seconds']
             result = subprocess.run(cmd, 
                                   capture_output=True, 
                                   text=True, 
-                                  timeout=120)  # 2 minute timeout
+                                  timeout=timeout)
             
             if result.returncode == 0 and md_path.exists():
                 file_size = md_path.stat().st_size
@@ -233,16 +251,21 @@ class PDFProcessor:
         """Remove files that are too small or corrupted"""
         cleaned = 0
         
-        # Clean PDFs smaller than 1KB
+        # Clean PDFs that don't meet size requirements
+        min_pdf_size = self.storage_config['min_pdf_size_kb'] * 1024
+        max_pdf_size = self.storage_config['max_pdf_size_mb'] * 1024 * 1024
+        
         for pdf_file in self.pdf_dir.glob("*.pdf"):
-            if pdf_file.stat().st_size < 1000:
-                self.logger.info(f"Removing small PDF: {pdf_file}")
+            size = pdf_file.stat().st_size
+            if not (min_pdf_size <= size <= max_pdf_size):
+                self.logger.info(f"Removing invalid PDF: {pdf_file} ({size} bytes)")
                 pdf_file.unlink()
                 cleaned += 1
         
-        # Clean Markdown files smaller than 100 bytes
+        # Clean Markdown files that are too small
+        min_md_size = self.storage_config['min_markdown_size_bytes']
         for md_file in self.md_dir.glob("*.md"):
-            if md_file.stat().st_size < 100:
+            if md_file.stat().st_size < min_md_size:
                 self.logger.info(f"Removing small Markdown: {md_file}")
                 md_file.unlink()
                 cleaned += 1
