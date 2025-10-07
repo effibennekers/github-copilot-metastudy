@@ -9,10 +9,7 @@ import logging
 from typing import List, Dict
 
 # Import configuratie
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent))
-from config import PROCESSING_CONFIG
+from ..config import PROCESSING_CONFIG
 
 class ArxivClient:
     def __init__(self):

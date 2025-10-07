@@ -12,9 +12,7 @@ from typing import Optional
 import hashlib
 
 # Import configuratie
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-from config import STORAGE_CONFIG, PROCESSING_CONFIG
+from ..config import STORAGE_CONFIG, PROCESSING_CONFIG
 
 class PDFProcessor:
     def __init__(self, pdf_dir: str = None, md_dir: str = None):

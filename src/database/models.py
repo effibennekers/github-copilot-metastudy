@@ -11,9 +11,7 @@ from typing import List, Dict, Optional
 from pathlib import Path
 
 # Import configuratie
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-from config import DATABASE_CONFIG, STORAGE_CONFIG
+from ..config import DATABASE_CONFIG, STORAGE_CONFIG
 
 class PaperDatabase:
     def __init__(self, db_path: str = None):

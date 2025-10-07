@@ -36,11 +36,43 @@ Dit is een basis Python project template met een proper virtual environment conf
 
 ## Gebruik
 
-Om het project uit te voeren:
+### Basis Gebruik
 
 ```bash
-python metastudy/main.py
+# Activeer virtual environment
+source venv/bin/activate
+
+# Draai volledige pipeline
+cd metastudy && python main.py
 ```
+
+### Configuratie Aanpassen
+
+Het systeem is volledig configureerbaar via `metastudy/config.py`. Je kunt aanpassen:
+
+#### 🔍 **Zoekparameters**
+```python
+SEARCH_CONFIG = {
+    "queries": [
+        "GitHub Copilot",
+        "AI code generation", 
+        # Voeg je eigen termen toe...
+    ],
+    "max_results_per_query": 20,
+    "total_max_papers": 200,
+}
+```
+
+#### ⚙️ **Processing Instellingen**
+- **Rate limiting**: API en download timeouts (min 3s voor arXiv compliance)
+- **Retry logic**: Maximum pogingen en delays  
+- **Conversie opties**: Pandoc vs pdfplumber preferences
+
+#### 📁 **Storage Configuratie**
+- **Directories**: PDF en Markdown opslag locaties
+- **Bestandsgroottes**: Min/max limieten voor validatie
+
+Zie [`CONFIGURATION_GUIDE.md`](CONFIGURATION_GUIDE.md) voor volledige documentatie.
 
 ## Project Structuur
 

@@ -8,13 +8,11 @@ import logging
 import sys
 from pathlib import Path
 
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
-from database import PaperDatabase
-from arxiv_client import ArxivClient
-from pdf_processor import PDFProcessor
-from config import (
+# Import from package modules
+from .database import PaperDatabase
+from .arxiv import ArxivClient
+from .pdf import PDFProcessor
+from .config import (
     SEARCH_CONFIG, 
     DATABASE_CONFIG, 
     STORAGE_CONFIG, 
