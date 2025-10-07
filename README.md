@@ -43,12 +43,12 @@ Dit is een basis Python project template met een proper virtual environment conf
 source venv/bin/activate
 
 # Draai volledige pipeline
-cd metastudy && python main.py
+python src/main.py
 ```
 
 ### Configuratie Aanpassen
 
-Het systeem is volledig configureerbaar via `metastudy/config.py`. Je kunt aanpassen:
+Het systeem is volledig configureerbaar via `src/config.py`. Je kunt aanpassen:
 
 #### 🔍 **Zoekparameters**
 ```python
@@ -88,8 +88,7 @@ github-copilot-metastudy/
 │   ├── database/           # Database module
 │   ├── tests/              # Unit tests
 │   ├── config.py           # Configuratie
-│   └── main.py             # Package workflow
-├── main.py                 # Entry point
+│   └── main.py             # Hoofd workflow
 ├── requirements.txt        # Dependencies
 ├── .gitignore             # Git ignore bestand
 └── README.md              # Dit bestand
