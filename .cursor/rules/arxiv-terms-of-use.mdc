@@ -20,37 +20,3 @@ Bron: [arXiv API Terms of Use](https://info.arxiv.org/help/api/tou.html)
 2. **Gebruik `time.sleep(3)` of vergelijkbare mechanismen** tussen API calls
 3. **Geen parallelle requests** naar de arXiv API
 4. **Monitor en log API usage** om compliance te waarborgen
-
-## Voorbeeld Implementatie
-
-```python
-import time
-import arxiv
-
-def safe_arxiv_search(query, max_results=10):
-    """
-    Zoek papers op arXiv met rate limiting compliance
-    """
-    # Rate limiting: wacht 3 seconden voor de request
-    time.sleep(3)
-    
-    client = arxiv.Client()
-    search = arxiv.Search(query=query, max_results=max_results)
-    
-    return list(client.results(search))
-```
-
-## Copyright en Gebruik
-
-- **Metadata** mag worden opgeslagen en gedeeld (CC0 1.0 Public Domain)
-- **E-print content** mag NIET worden opgeslagen/gediend zonder toestemming copyright houder
-- **Verwijs altijd naar arXiv.org** voor volledige papers
-- **Link naar abstract pages** in plaats van directe PDF links
-
-## Consequenties van Overtreding
-
-- **IP ban** door arXiv mogelijk
-- **Verstoring van service** voor andere gebruikers  
-- **Schending van Terms of Use** kan leiden tot permanente blokkering
-
-**BELANGRIJK**: Deze regels zijn niet optioneel. Overtreding kan leiden tot blokkering van de arXiv API toegang voor het hele project.

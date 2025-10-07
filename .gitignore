@@ -26,6 +26,18 @@ venv/
 env/
 ENV/
 
+# Data directories - PDFs and Markdown files
+data/
+*.pdf
+*.md
+!README.md
+!IMPLEMENTATION_PLAN.md
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
 # IDE
 .vscode/
 .idea/
