@@ -63,7 +63,7 @@ class PaperDatabase:
                     license TEXT,
                     abstract TEXT NOT NULL,
                     versions TEXT NOT NULL,
-                    update_date TEXT NOT NULL,
+                    update_date DATE NOT NULL,
                     authors_parsed TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -348,7 +348,9 @@ class PaperDatabase:
                     id, submitter, authors, title, comments, journal_ref, doi, report_no,
                     categories, license, abstract, versions, update_date, authors_parsed,
                     created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS DATE), %s, %s, %s
+                )
             """
             cur = conn.cursor()
             cur.execute(
@@ -435,7 +437,9 @@ class PaperDatabase:
                     id, submitter, authors, title, comments, journal_ref, doi, report_no,
                     categories, license, abstract, versions, update_date, authors_parsed,
                     created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS DATE), %s, %s, %s
+                )
             """
             cur.executemany(sql, rows_to_insert)
             conn.commit()
