@@ -47,3 +47,6 @@ data/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logging
+*.log

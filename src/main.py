@@ -206,7 +206,7 @@ def llm_quality_check(db: PaperDatabase, llm_checker: LLMChecker, logger) -> int
     # Get papers that need LLM quality check
     papers_to_check = db.get_papers_by_status(
         download_status='DOWNLOADED',
-        llm_check_status='PENDING'
+        llm_status='PENDING'
     )
     
     if not papers_to_check:

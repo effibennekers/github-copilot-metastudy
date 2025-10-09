@@ -123,7 +123,7 @@ LOGGING_CONFIG = {
 
 # LLM Configuration (voor kwaliteitscontrole en analyse)
 LLM_CONFIG = {
-    "enabled": False,                 # Schakel LLM kwaliteitscontrole in/uit
+    "enabled": True,                 # Schakel LLM kwaliteitscontrole in/uit
     "provider": "ollama",             # ollama, openai, anthropic
     "model_name": "llama3.2",         # Naam van het te gebruiken model
     "ollama_api_base_url": "http://localhost:11434", # Ollama API endpoint
