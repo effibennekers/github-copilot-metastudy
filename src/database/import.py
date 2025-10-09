@@ -105,3 +105,73 @@ def import_metadata(
 
     logger.info("%d metadata records geïmporteerd uit %s", inserted_count, json_path)
     return inserted_count
+
+
+def _build_arxiv_id_from_metadata(meta_id: str, versions: object) -> str:
+    """Bepaal het volledige arXiv ID inclusief laatste versiesuffix.
+
+    - meta_id: basis ID zonder versiesuffix, bv. "2510.01576"
+    - versions: lijst (of JSON-string) met versieobjecten, bv. [{"version": "v1"}, {"version": "v2"}]
+    """
+    try:
+        if isinstance(versions, str):
+            versions_list = json.loads(versions)
+        else:
+            versions_list = versions or []
+    except Exception:
+        versions_list = []
+
+    suffix = "v1"
+    if isinstance(versions_list, list) and versions_list:
+        last = versions_list[-1]
+        if isinstance(last, dict):
+            candidate = last.get("version") or last.get("v")
+            if isinstance(candidate, str) and candidate:
+                suffix = candidate if candidate.startswith("v") else f"v{candidate}"
+        elif isinstance(last, str):
+            suffix = last if last.startswith("v") else f"v{last}"
+
+    return f"{meta_id}{suffix}"
+
+
+def prepare_paper_from_metadata(db_path: Optional[str] = None, batch_size: int = 5000, limit: Optional[int] = None) -> int:
+    """Maak paper-records aan voor alle metadata records.
+
+    - arxiv_id: concateneer metadata.id met laatste versie uit "versions" (bv. 2510.01576v2)
+    - metadata_id: foreign key verwijzing naar metadata.id
+
+    Returns: aantal nieuw aangemaakte paper records
+    """
+    db = PaperDatabase(db_path)
+    created = 0
+
+    # Stream metadata records in batches om geheugen te sparen
+    with db._connect() as conn:
+        cur = conn.cursor(name="metadata_iter")  # server-side cursor voor streaming
+        base_sql = "SELECT id, versions FROM metadata ORDER BY id"
+        if limit and limit > 0:
+            # server-side cursor ondersteunt LIMIT in query
+            cur.execute(f"{base_sql} LIMIT %s", (limit,))
+        else:
+            cur.execute(base_sql)
+
+        while True:
+            rows = cur.fetchmany(batch_size)
+            if not rows:
+                break
+
+            for row in rows:
+                meta_id = row["id"]
+                versions = row.get("versions")
+                arxiv_id = _build_arxiv_id_from_metadata(meta_id, versions)
+
+                try:
+                    if db.paper_exists(arxiv_id):
+                        continue
+                    db.insert_paper({"arxiv_id": arxiv_id, "metadata_id": meta_id})
+                    created += 1
+                except Exception as exc:
+                    logger.warning("Overslaan van %s door fout: %s", meta_id, exc)
+
+    logger.info("%d paper records aangemaakt uit metadata", created)
+    return created
