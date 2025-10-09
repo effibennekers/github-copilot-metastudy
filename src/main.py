@@ -7,6 +7,7 @@ Uitgebreide pipeline voor paper downloading, conversie en analyse
 import logging
 import logging.config
 import sys
+from pathlib import Path
 
 # Import from package modules
 from src.database import PaperDatabase
@@ -59,7 +60,7 @@ def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger
     logger.info(
         "Configuratie: %s zoektermen, max %s per query", len(queries), max_results_per_query
     )
-    logger.info(f"Totaal maximum papers: {total_max_papers}")
+    logger.info("Totaal maximum papers: %s", total_max_papers)
 
     total_new_papers = 0
 
@@ -68,7 +69,7 @@ def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger
 
         # Check of we het totaal maximum hebben bereikt
         if total_new_papers >= total_max_papers:
-            logger.info(f"Maximum aantal papers bereikt ({total_max_papers}), stoppen met zoeken")
+            logger.info("Maximum aantal papers bereikt (%s), stoppen met zoeken", total_max_papers)
             break
 
         try:
@@ -84,22 +85,24 @@ def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger
                     db.insert_paper(paper)
                     new_papers += 1
                     logger.info(
-                        f"Nieuw paper toegevoegd: {paper['arxiv_id']} - {paper['title'][:50]}..."
+                        "Nieuw paper toegevoegd: %s - %s...",
+                        paper["arxiv_id"],
+                        paper["title"][:50],
                     )
 
                     # Check quota again
                     if total_new_papers + new_papers >= total_max_papers:
-                        logger.info(f"Maximum papers quota bereikt tijdens verwerking")
+                        logger.info("Maximum papers quota bereikt tijdens verwerking")
                         break
 
-            logger.info(f"Query '{query}': {new_papers} nieuwe papers toegevoegd")
+            logger.info("Query '%s': %s nieuwe papers toegevoegd", query, new_papers)
             total_new_papers += new_papers
 
         except Exception as e:
             logger.error(f"Error in search query '{query}': {e}")
             continue
 
-    logger.info(f"STAP 1 VOLTOOID: Totaal {total_new_papers} nieuwe papers toegevoegd")
+    logger.info("STAP 1 VOLTOOID: Totaal %s nieuwe papers toegevoegd", total_new_papers)
     return total_new_papers
 
 
@@ -351,8 +354,13 @@ def main():
     logger.info(f"  - Zoektermen: {len(search_config['queries'])}")
     logger.info(f"  - Max per query: {search_config['max_results_per_query']}")
     logger.info(f"  - Totaal max: {search_config['total_max_papers']}")
+    pg = DATABASE_CONFIG["pg"]
     logger.info(
-        f"  - Database: postgresql://{DATABASE_CONFIG['pg']['user']}@{DATABASE_CONFIG['pg']['host']}:{DATABASE_CONFIG['pg']['port']}/{DATABASE_CONFIG['pg']['dbname']}"
+        "  - Database: postgresql://%s@%s:%s/%s",
+        pg["user"],
+        pg["host"],
+        pg["port"],
+        pg["dbname"],
     )
     logger.info(f"  - PDF directory: {STORAGE_CONFIG['pdf_directory']}")
     logger.info(f"  - Markdown directory: {STORAGE_CONFIG['markdown_directory']}")

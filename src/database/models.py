@@ -3,8 +3,8 @@ Database module voor GitHub Copilot Metastudy
 Beheert PostgreSQL database voor paper metadata en status tracking
 """
 
-import psycopg2
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 import json
 import logging
 from datetime import datetime
@@ -23,14 +23,15 @@ class PaperDatabase:
     def _connect(self):
         """Return a PostgreSQL connection."""
         pg = DATABASE_CONFIG["pg"]
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=pg["host"],
             port=pg["port"],
             dbname=pg["dbname"],
             user=pg["user"],
             password=pg["password"],
-            cursor_factory=psycopg2.extras.RealDictCursor,
         )
+        # Gebruik dict_row zodat fetches dicts opleveren i.p.v. tuples
+        conn.row_factory = dict_row
         return conn
 
     def _execute(self, conn, query: str, params: tuple = ()):
@@ -168,22 +169,21 @@ class PaperDatabase:
         params = []
 
         if download_status:
-            query += " AND download_status = ?"
+            query += " AND download_status = %s"
             params.append(download_status)
 
         if download_type:
-            query += " AND download_type = ?"
+            query += " AND download_type = %s"
             params.append(download_type)
 
         if llm_status:
-            query += " AND llm_check_status = ?"
+            query += " AND llm_check_status = %s"
             params.append(llm_status)
 
         query += " ORDER BY created_at DESC"
 
         with self._connect() as conn:
             cur = conn.cursor()
-            query = query.replace("?", "%s")
             cur.execute(query, params)
 
             papers = []
@@ -215,16 +215,15 @@ class PaperDatabase:
         params = []
 
         for field, value in kwargs.items():
-            set_clauses.append(f"{field} = ?")
+            set_clauses.append(f"{field} = %s")
             params.append(value)
 
         params.append(arxiv_id)  # For WHERE clause
 
-        query = f"UPDATE papers SET {', '.join(set_clauses)} WHERE arxiv_id = ?"
+        query = f"UPDATE papers SET {', '.join(set_clauses)} WHERE arxiv_id = %s"
 
         with self._connect() as conn:
             cur = conn.cursor()
-            query = query.replace("?", "%s")
             cur.execute(query, params)
             conn.commit()
 
@@ -241,38 +240,38 @@ class PaperDatabase:
 
             # Total papers
             cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM papers")
-            stats["total_papers"] = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(1) AS count FROM papers")
+            stats["total_papers"] = cur.fetchone()["count"]
 
             # Download status breakdown
             cur.execute(
                 """
-                SELECT download_status, COUNT(*) 
+                SELECT download_status, COUNT(1) AS count
                 FROM papers 
                 GROUP BY download_status
             """
             )
-            stats["download_status"] = dict(cur.fetchall())
+            stats["download_status"] = {row["download_status"]: row["count"] for row in cur.fetchall()}
 
             # Download type breakdown
             cur.execute(
                 """
-                SELECT download_type, COUNT(*) 
+                SELECT download_type, COUNT(1) AS count
                 FROM papers 
                 GROUP BY download_type
             """
             )
-            stats["download_type"] = dict(cur.fetchall())
+            stats["download_type"] = {row["download_type"]: row["count"] for row in cur.fetchall()}
 
             # LLM status breakdown
             cur.execute(
                 """
-                SELECT llm_check_status, COUNT(*) 
+                SELECT llm_check_status, COUNT(1) AS count
                 FROM papers 
                 GROUP BY llm_check_status
             """
             )
-            stats["llm_status"] = dict(cur.fetchall())
+            stats["llm_status"] = {row["llm_check_status"]: row["count"] for row in cur.fetchall()}
 
             return stats
 
@@ -332,14 +331,7 @@ class PaperDatabase:
         """Check of metadata record al in database staat"""
         with self._connect() as conn:
             cur = conn.cursor()
-            cur.execute(
-                (
-                    "SELECT 1 FROM metadata WHERE id = %s"
-                    if self.engine == "postgres"
-                    else "SELECT 1 FROM metadata WHERE id = ?"
-                ),
-                (metadata_id,),
-            )
+            cur.execute("SELECT 1 FROM metadata WHERE id = %s", (metadata_id,))
             return cur.fetchone() is not None
 
     def insert_metadata(self, metadata_record: Dict) -> None:
@@ -356,10 +348,8 @@ class PaperDatabase:
                     id, submitter, authors, title, comments, journal_ref, doi, report_no,
                     categories, license, abstract, versions, update_date, authors_parsed,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
-            if self.engine == "postgres":
-                sql = sql.replace("?", "%s")
             cur = conn.cursor()
             cur.execute(
                 sql,
@@ -400,13 +390,10 @@ class PaperDatabase:
             if not ids:
                 return 0
 
-            placeholders = ",".join(["%s" if self.engine == "postgres" else "?"] * len(ids))
+            placeholders = ",".join(["%s"] * len(ids))
             cur = conn.cursor()
             cur.execute(f"SELECT id FROM metadata WHERE id IN ({placeholders})", ids)
-            if self.engine == "postgres":
-                existing_ids = {row["id"] for row in cur.fetchall()}
-            else:
-                existing_ids = {row[0] for row in cur.fetchall()}
+            existing_ids = {row["id"] for row in cur.fetchall()}
 
             # Prepare insert tuples, sla bestaande over
             rows_to_insert = []
@@ -448,10 +435,8 @@ class PaperDatabase:
                     id, submitter, authors, title, comments, journal_ref, doi, report_no,
                     categories, license, abstract, versions, update_date, authors_parsed,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
-            if self.engine == "postgres":
-                sql = sql.replace("?", "%s")
             cur.executemany(sql, rows_to_insert)
             conn.commit()
 
@@ -502,28 +487,28 @@ class PaperDatabase:
 
             # Total metadata records
             cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM metadata")
-            stats["total_metadata"] = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(1) AS count FROM metadata")
+            stats["total_metadata"] = cur.fetchone()["count"]
 
             # Records with DOI
-            cur.execute("SELECT COUNT(*) FROM metadata WHERE doi IS NOT NULL AND doi != ''")
-            stats["with_doi"] = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(1) AS count FROM metadata WHERE doi IS NOT NULL AND doi != ''")
+            stats["with_doi"] = cur.fetchone()["count"]
 
             # Records without submitter
-            cur.execute("SELECT COUNT(*) FROM metadata WHERE submitter IS NULL")
-            stats["null_submitter"] = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(1) AS count FROM metadata WHERE submitter IS NULL")
+            stats["null_submitter"] = cur.fetchone()["count"]
 
             # Most common categories (top 10)
             cur.execute(
                 """
-                SELECT categories, COUNT(*) as count 
+                SELECT categories, COUNT(1) as count 
                 FROM metadata 
                 GROUP BY categories 
                 ORDER BY count DESC 
                 LIMIT 10
             """
             )
-            stats["top_categories"] = dict(cur.fetchall())
+            stats["top_categories"] = {row["categories"]: row["count"] for row in cur.fetchall()}
 
             return stats
 
