@@ -15,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from src.database import PaperDatabase
 from src.arxiv_client import ArxivClient
-from src.pdf import PDFProcessor
 from src.llm import LLMChecker
 from src.config import (
     SEARCH_CONFIG, 
@@ -48,19 +47,15 @@ def initialize_components():
     logger.info("Initializing components...")
     db = PaperDatabase(DATABASE_CONFIG['db_path'])
     arxiv_client = ArxivClient()
-    pdf_processor = PDFProcessor(
-        STORAGE_CONFIG['pdf_directory'], 
-        STORAGE_CONFIG['markdown_directory']
-    )
     llm_checker = LLMChecker()
     
     logger.info("✅ All components initialized successfully")
-    return db, arxiv_client, pdf_processor, llm_checker, logger
+    return db, arxiv_client, llm_checker, logger
 
 
 def cmd_status(args):
     """Show database statistics"""
-    db, _, _, _, logger = initialize_components()
+    db, _, _, logger = initialize_components()
     
     logger.info("📊 Database Status")
     print_stats(db)
@@ -68,7 +63,7 @@ def cmd_status(args):
 
 def cmd_search(args):
     """Run paper search and indexing step"""
-    db, arxiv_client, _, _, logger = initialize_components()
+    db, arxiv_client, _, logger = initialize_components()
     
     logger.info("🔍 Starting paper search and indexing...")
     new_papers = search_and_index_papers(db, arxiv_client, logger)
@@ -80,10 +75,10 @@ def cmd_search(args):
 
 def cmd_download(args):
     """Run PDF download step"""
-    db, _, pdf_processor, _, logger = initialize_components()
+    db, arxiv_client, _, logger = initialize_components()
     
     logger.info("⬇️ Starting PDF downloads...")
-    downloads = download_pdfs(db, pdf_processor, logger)
+    downloads = download_pdfs(db, arxiv_client, logger)
     
     print(f"\n✅ Downloads completed: {downloads} PDFs gedownload")
     if UI_CONFIG.get('show_statistics', True):
@@ -92,10 +87,10 @@ def cmd_download(args):
 
 def cmd_convert(args):
     """Run PDF to Markdown conversion step"""
-    db, _, pdf_processor, _, logger = initialize_components()
+    db, _, _, logger = initialize_components()
     
     logger.info("📝 Starting PDF to Markdown conversion...")
-    conversions = convert_to_markdown(db, pdf_processor, logger)
+    conversions = convert_to_markdown(db, logger)
     
     print(f"\n✅ Conversions completed: {conversions} bestanden geconverteerd")
     if UI_CONFIG.get('show_statistics', True):
@@ -104,7 +99,7 @@ def cmd_convert(args):
 
 def cmd_llm(args):
     """Run LLM quality check step"""
-    db, _, _, llm_checker, logger = initialize_components()
+    db, _, llm_checker, logger = initialize_components()
     
     logger.info("🤖 Starting LLM quality check...")
     llm_fixes = llm_quality_check(db, llm_checker, logger)
@@ -116,12 +111,12 @@ def cmd_llm(args):
 
 def cmd_pipeline(args):
     """Run complete pipeline"""
-    db, arxiv_client, pdf_processor, llm_checker, logger = initialize_components()
+    db, arxiv_client, llm_checker, logger = initialize_components()
     
     logger.info("🚀 GitHub Copilot Metastudy - Pipeline Start")
     logger.info("=" * 70)
     logger.info("Configuratie geladen:")
-    logger.info(f"  - Zoektermen: {len(SEARCH_CONFIG['search_queries'])}")
+    logger.info(f"  - Zoektermen: {len(SEARCH_CONFIG['queries'])}")
     logger.info(f"  - Max per query: {SEARCH_CONFIG['max_results_per_query']}")
     logger.info(f"  - Totaal max: {SEARCH_CONFIG['total_max_papers']}")
     logger.info(f"  - Database: {DATABASE_CONFIG['db_path']}")
@@ -134,8 +129,8 @@ def cmd_pipeline(args):
     
     # Run all steps
     new_papers = search_and_index_papers(db, arxiv_client, logger)
-    downloads = download_pdfs(db, pdf_processor, logger)
-    conversions = convert_to_markdown(db, pdf_processor, logger)
+    downloads = download_pdfs(db, arxiv_client, logger)  
+    conversions = convert_to_markdown(db, logger)
     llm_fixes = llm_quality_check(db, llm_checker, logger)
     
     # Final statistics

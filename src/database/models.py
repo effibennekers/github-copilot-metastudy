@@ -32,9 +32,14 @@ class PaperDatabase:
                     title TEXT NOT NULL,
                     abstract TEXT,
                     authors TEXT,  -- JSON array van auteurs
+                    categories TEXT,  -- JSON array van categorieën
                     published_date TEXT,
+                    updated_date TEXT,  -- Laatste update datum
                     url TEXT,
                     pdf_url TEXT,
+                    doi TEXT,  -- DOI indien beschikbaar
+                    journal_ref TEXT,  -- Journal reference
+                    comment TEXT,  -- Paper comment
                     pdf_path TEXT,
                     md_path TEXT,
                     download_status TEXT DEFAULT 'PENDING',  -- PENDING, DOWNLOADED, FAILED
@@ -64,23 +69,29 @@ class PaperDatabase:
     
     def insert_paper(self, paper_data: Dict) -> None:
         """Voeg nieuw paper toe aan database"""
-        # Convert authors list to JSON string
+        # Convert arrays to JSON strings
         authors_json = json.dumps(paper_data.get('authors', []))
+        categories_json = json.dumps(paper_data.get('categories', []))
         
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 INSERT INTO papers (
-                    arxiv_id, title, abstract, authors, published_date, 
-                    url, pdf_url, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    arxiv_id, title, abstract, authors, categories, published_date, 
+                    updated_date, url, pdf_url, doi, journal_ref, comment, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 paper_data['arxiv_id'],
                 paper_data['title'],
                 paper_data.get('abstract', ''),
                 authors_json,
+                categories_json,
                 paper_data.get('published_date', ''),
+                paper_data.get('updated_date'),
                 paper_data.get('url', ''),
                 paper_data.get('pdf_url', ''),
+                paper_data.get('doi'),
+                paper_data.get('journal_ref'),
+                paper_data.get('comment'),
                 datetime.now().isoformat(),
                 datetime.now().isoformat()
             ))
@@ -111,9 +122,11 @@ class PaperDatabase:
             papers = []
             for row in cursor.fetchall():
                 paper = dict(row)
-                # Convert authors JSON back to list
+                # Convert JSON fields back to Python objects
                 if paper['authors']:
                     paper['authors'] = json.loads(paper['authors'])
+                if paper.get('categories'):
+                    paper['categories'] = json.loads(paper['categories'])
                 papers.append(paper)
                 
             return papers
@@ -180,8 +193,46 @@ class PaperDatabase:
             row = cursor.fetchone()
             if row:
                 paper = dict(row)
+                # Parse JSON fields
                 if paper['authors']:
                     paper['authors'] = json.loads(paper['authors'])
+                if paper.get('categories'):
+                    paper['categories'] = json.loads(paper['categories'])
                 return paper
             
             return None
+    
+    def search_papers_by_category(self, category: str) -> List[Dict]:
+        """Zoek papers op basis van categorie"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM papers WHERE categories LIKE ?",
+                (f'%{category}%',)
+            )
+            papers = []
+            for row in cursor.fetchall():
+                paper = dict(row)
+                if paper['authors']:
+                    paper['authors'] = json.loads(paper['authors'])
+                if paper.get('categories'):
+                    paper['categories'] = json.loads(paper['categories'])
+                papers.append(paper)
+            return papers
+    
+    def get_papers_with_doi(self) -> List[Dict]:
+        """Haal papers op die een DOI hebben"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM papers WHERE doi IS NOT NULL AND doi != ''"
+            )
+            papers = []
+            for row in cursor.fetchall():
+                paper = dict(row)
+                if paper['authors']:
+                    paper['authors'] = json.loads(paper['authors'])
+                if paper.get('categories'):
+                    paper['categories'] = json.loads(paper['categories'])
+                papers.append(paper)
+            return papers

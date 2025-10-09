@@ -12,8 +12,8 @@ from pathlib import Path
 # Import from package modules
 from src.database import PaperDatabase
 from src.arxiv_client import ArxivClient
-from src.pdf import PDFProcessor
 from src.llm import LLMChecker
+from src.conversion import pdf_naar_md
 from src.config import (
     SEARCH_CONFIG, 
     DATABASE_CONFIG, 
@@ -23,6 +23,7 @@ from src.config import (
     LLM_CONFIG,
     UI_CONFIG
 )
+from pathlib import Path
 
 def print_stats(db: PaperDatabase):
     """Print database statistieken"""
@@ -97,7 +98,7 @@ def search_and_index_papers(db: PaperDatabase, arxiv_client: ArxivClient, logger
     logger.info(f"STAP 1 VOLTOOID: Totaal {total_new_papers} nieuwe papers toegevoegd")
     return total_new_papers
 
-def download_pdfs(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
+def download_pdfs(db: PaperDatabase, arxiv_client: ArxivClient, logger):
     """STAP 2: Download PDFs"""
     logger.info("=== STAP 2: PDFs downloaden ===")
     
@@ -109,6 +110,10 @@ def download_pdfs(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
     
     logger.info(f"Te downloaden PDFs: {len(pending_downloads)}")
     
+    # Ensure PDF directory exists
+    pdf_dir = Path(STORAGE_CONFIG['pdf_directory'])
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    
     downloaded_count = 0
     failed_count = 0
     
@@ -116,9 +121,12 @@ def download_pdfs(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
         logger.info(f"[{i}/{len(pending_downloads)}] Downloading: {paper['arxiv_id']}")
         
         try:
-            pdf_path = pdf_processor.download_pdf(
-                paper['arxiv_id'], 
-                paper['pdf_url']
+            # Use ArXiv client's PDF download functionality
+            pdf_filename = f"{paper['arxiv_id']}.pdf"
+            pdf_path = arxiv_client.download_paper_pdf(
+                paper['arxiv_id'],
+                str(pdf_dir),
+                pdf_filename
             )
             
             if pdf_path:
@@ -148,7 +156,7 @@ def download_pdfs(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
     logger.info(f"STAP 2 VOLTOOID: {downloaded_count} downloads successful, {failed_count} failed")
     return downloaded_count
 
-def convert_to_markdown(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
+def convert_to_markdown(db: PaperDatabase, logger):
     """STAP 3: Convert naar Markdown"""
     logger.info("=== STAP 3: PDF naar Markdown conversie ===")
     
@@ -163,15 +171,22 @@ def convert_to_markdown(db: PaperDatabase, pdf_processor: PDFProcessor, logger):
     
     logger.info(f"Te converteren PDFs: {len(to_convert)}")
     
+    # Ensure markdown directory exists
+    md_dir = Path(STORAGE_CONFIG['markdown_directory'])
+    md_dir.mkdir(parents=True, exist_ok=True)
+    
     converted_count = 0
     
     for i, paper in enumerate(to_convert, 1):
         logger.info(f"[{i}/{len(to_convert)}] Converting: {paper['arxiv_id']}")
         
         try:
-            md_path = pdf_processor.pdf_to_markdown(
-                paper['pdf_path'], 
-                paper['arxiv_id']
+            # Use conversion module for PDF to Markdown conversion
+            md_path = pdf_naar_md(
+                pdf_path=paper['pdf_path'], 
+                paper_id=paper['arxiv_id'],
+                output_dir=str(md_dir),
+                min_size_bytes=STORAGE_CONFIG['min_markdown_size_bytes']
             )
             
             if md_path:
@@ -316,10 +331,6 @@ def main():
         logger.info("Initializing components...")
         db = PaperDatabase(DATABASE_CONFIG['db_path'])
         arxiv_client = ArxivClient()
-        pdf_processor = PDFProcessor(
-            STORAGE_CONFIG['pdf_directory'], 
-            STORAGE_CONFIG['markdown_directory']
-        )
         llm_checker = LLMChecker()
         
         logger.info("✅ All components initialized successfully")
@@ -332,10 +343,10 @@ def main():
         new_papers = search_and_index_papers(db, arxiv_client, logger)
         
         # STAP 2: Download PDFs
-        downloads = download_pdfs(db, pdf_processor, logger)
+        downloads = download_pdfs(db, arxiv_client, logger)
         
         # STAP 3: Convert naar Markdown
-        conversions = convert_to_markdown(db, pdf_processor, logger)
+        conversions = convert_to_markdown(db, logger)
         
         # STAP 4: LLM Kwaliteitscontrole
         llm_fixes = llm_quality_check(db, llm_checker, logger)

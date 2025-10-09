@@ -10,6 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 import logging
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -176,3 +177,102 @@ def verwijder_uitgepakte_tarball(extracted_path: str, force: bool = False) -> bo
     except OSError as e:
         logger.error(f"Fout bij verwijderen directory: {e}")
         raise
+
+
+def pdf_naar_md(pdf_path: str, paper_id: str, output_dir: Optional[str] = None, min_size_bytes: int = 1000) -> Optional[str]:
+    """
+    Converteer een PDF bestand naar Markdown met pdfplumber.
+    
+    Args:
+        pdf_path: Pad naar het input PDF bestand
+        paper_id: ID van het paper voor de output filename
+        output_dir: Directory voor output, standaard hetzelfde als input
+        min_size_bytes: Minimale grootte voor geldig markdown bestand
+        
+    Returns:
+        Pad naar het gegenereerde markdown bestand, of None bij falen
+        
+    Raises:
+        FileNotFoundError: Als input bestand niet bestaat
+        ImportError: Als pdfplumber niet beschikbaar is
+    """
+    if not os.path.exists(pdf_path):
+        raise FileNotFoundError(f"Input PDF niet gevonden: {pdf_path}")
+    
+    if output_dir is None:
+        output_dir = os.path.dirname(pdf_path)
+    
+    output_file = os.path.join(output_dir, f"{paper_id}.md")
+    
+    # Check of Markdown al bestaat en geldig is
+    if os.path.exists(output_file):
+        file_size = os.path.getsize(output_file)
+        if file_size >= min_size_bytes:
+            logger.info(f"Markdown bestaat al: {output_file} ({file_size} bytes)")
+            return output_file
+        else:
+            logger.warning(f"Bestaande markdown te klein, herconverteren: {output_file}")
+            os.unlink(output_file)
+    
+    try:
+        logger.info(f"Converteer PDF naar MD: {pdf_path} -> {output_file}")
+        return _convert_with_pdfplumber(pdf_path, output_file, paper_id, min_size_bytes)
+        
+    except Exception as e:
+        logger.error(f"PDF naar Markdown conversie gefaald voor {paper_id}: {e}")
+        return None
+
+
+def _convert_with_pdfplumber(pdf_path: str, md_path: str, paper_id: str, min_size_bytes: int) -> Optional[str]:
+    """
+    Converteer PDF naar Markdown met pdfplumber.
+    
+    Args:
+        pdf_path: Pad naar het input PDF bestand
+        md_path: Pad naar het output Markdown bestand  
+        paper_id: ID van het paper
+        min_size_bytes: Minimale grootte voor geldig bestand
+        
+    Returns:
+        Pad naar het gegenereerde markdown bestand, of None bij falen
+        
+    Raises:
+        ImportError: Als pdfplumber niet beschikbaar is
+    """
+    try:
+        import pdfplumber
+        
+        with pdfplumber.open(pdf_path) as pdf:
+            text_content = []
+            
+            for page_num, page in enumerate(pdf.pages):
+                text = page.extract_text()
+                if text:
+                    text_content.append(f"## Page {page_num + 1}\n\n{text}\n\n")
+            
+            if text_content:
+                markdown_content = f"# {paper_id}\n\n" + "".join(text_content)
+                
+                with open(md_path, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content)
+                
+                file_size = os.path.getsize(md_path)
+                
+                if file_size >= min_size_bytes:
+                    logger.info(f"PDFPlumber conversie succesvol: {md_path} ({file_size} bytes)")
+                    return md_path
+                else:
+                    logger.error(f"Gegenereerde markdown te klein: {md_path} ({file_size} bytes)")
+                    if os.path.exists(md_path):
+                        os.unlink(md_path)
+                    return None
+            else:
+                logger.error(f"Geen tekst geëxtraheerd uit PDF: {paper_id}")
+                return None
+                
+    except ImportError:
+        logger.error("pdfplumber niet beschikbaar - installeer met: pip install pdfplumber")
+        raise
+    except Exception as e:
+        logger.error(f"PDFPlumber conversie fout: {e}")
+        return None

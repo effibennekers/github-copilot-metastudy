@@ -23,36 +23,22 @@ SEARCH_CONFIG = {
     "max_results_per_query": 20,
     
     # Totaal maximum aantal papers om te processsen (veiligheidsbeperking)
-    "total_max_papers": 200,
-    
-    # ArXiv sorteer criteria
-    "sort_by": "submittedDate",  # submittedDate, lastUpdatedDate, relevance
-    
-    # Filter op datum (optioneel)
-    "date_filter": {
-        "enabled": False,
-        "start_date": "2020-01-01",  # YYYY-MM-DD format
-        "end_date": None  # None voor huidige datum
-    }
+    "total_max_papers": 200
 }
 
 # Database Configuration  
 DATABASE_CONFIG = {
-    "db_path": "data/papers.db",
-    "backup_enabled": True,
-    "backup_frequency": "daily"  # daily, weekly, monthly
+    "db_path": "data/papers.db"
 }
 
 # File Storage Configuration
 STORAGE_CONFIG = {
+    # Directories die daadwerkelijk gebruikt worden
     "pdf_directory": "data/pdf",
-    "markdown_directory": "data/md", 
-    "backup_directory": "data/backups",
+    "markdown_directory": "data/md",
     
-    # Bestandsgroottes
-    "max_pdf_size_mb": 50,  # Maximum PDF grootte in MB
-    "min_pdf_size_kb": 1,   # Minimum PDF grootte in KB (filter voor lege bestanden)
-    "min_markdown_size_bytes": 100  # Minimum Markdown grootte in bytes
+    # Minimum grootte voor geldig markdown bestand
+    "min_markdown_size_bytes": 100
 }
 
 # Processing Configuration
@@ -61,17 +47,8 @@ PROCESSING_CONFIG = {
     "api_rate_limit_seconds": 3,
     "download_rate_limit_seconds": 3,
     
-    # Retry configuratie
-    "max_retries": 2,
-    "retry_delay_seconds": 5,
-    
-    # Timeout configuratie  
-    "api_timeout_seconds": 30,
-    "download_timeout_seconds": 60,
-    "conversion_timeout_seconds": 120, # Timeout voor PDF naar Markdown conversie
-    
-    # Parallel processing (LET OP: Rate limiting moet gerespecteerd worden!)
-    "max_concurrent_downloads": 1,  # MOET 1 blijven voor arXiv compliance
+    # Timeout voor PDF downloads
+    "download_timeout_seconds": 60
 }
 
 # ==============================================================================
@@ -123,21 +100,14 @@ LOGGING_CONFIG = {
 
 # LLM Configuration (voor kwaliteitscontrole en analyse)
 LLM_CONFIG = {
-    "enabled": True,                 # Schakel LLM kwaliteitscontrole in/uit
-    "provider": "ollama",             # ollama, openai, anthropic
-    "model_name": "llama3.2",         # Naam van het te gebruiken model
-    "ollama_api_base_url": "http://localhost:11434", # Ollama API endpoint
-    "timeout_seconds": 120,           # Timeout voor LLM requests
-    "max_retries": 2,                 # Max aantal pogingen bij failures
-    "retry_delay_seconds": 5,         # Wachttijd tussen pogingen
+    "enabled": True,
+    "model_name": "llama3.2",
+    "ollama_api_base_url": "http://localhost:11434",
+    "temperature": 0.1,
+    "batch_size": 5,
+    "batch_delay_seconds": 10,
     
-    # Processing settings
-    "max_tokens": 4000,               # Max tokens voor LLM response
-    "temperature": 0.1,               # Creativiteit van de LLM (laag voor consistentie)
-    "batch_size": 5,                  # Aantal papers per batch
-    "batch_delay_seconds": 10,        # Wachttijd tussen batches
-    
-    # Quality check prompts
+    # Quality check prompt template
     "prompt_template": """Je bent een expert in het controleren van academische papers die zijn geconverteerd van PDF naar Markdown.
 
 Controleer de volgende Markdown tekst op:
@@ -157,19 +127,13 @@ BELANGRIJKE REGELS:
 - Focus alleen op Markdown opmaak verbetering
 - Als de tekst al goed geformatteerd is, verander dan niets
 
-Antwoord ALLEEN met de gecorrigeerde Markdown, geen extra uitleg of commentaar.""",
-    
-    # Analysis prompts voor verschillende aspecten
-    "summary_prompt": "Maak een korte samenvatting van deze paper in het Nederlands:",
-    "keyword_extraction_prompt": "Extraheer de belangrijkste keywords uit deze paper:",
+Antwoord ALLEEN met de gecorrigeerde Markdown, geen extra uitleg of commentaar."""
 }
 
 # User Interface Configuration
 UI_CONFIG = {
     "show_progress_bars": True,
-    "show_statistics": True,
-    "colored_output": True,
-    "verbose_logging": False
+    "show_statistics": True
 }
 
 # Export deze configuraties voor gemakkelijke import
