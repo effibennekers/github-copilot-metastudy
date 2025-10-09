@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "submitter": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authors": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "comments": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "journal-ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "doi": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "report-no": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "categories": {
+      "type": "string"
+    },
+    "license": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "abstract": {
+      "type": "string"
+    },
+    "versions": {
+      "type": "array"
+    },
+    "update_date": {
+      "type": "string"
+    },
+    "authors_parsed": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "authors",
+    "title",
+    "categories",
+    "abstract",
+    "versions",
+    "update_date",
+    "authors_parsed"
+  ]
+}
