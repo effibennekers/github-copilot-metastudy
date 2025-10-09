@@ -45,6 +45,9 @@ class PaperDatabase:
             # Postgres: cascade drops, bestaan kunnen ontbreken
             cur = conn.cursor()
             cur.execute("DROP TABLE IF EXISTS papers CASCADE")
+            # Nieuwe tabellen worden afhankelijk van metadata; droppen in correcte volgorde
+            cur.execute("DROP TABLE IF EXISTS llm_answers CASCADE")
+            cur.execute("DROP TABLE IF EXISTS questions CASCADE")
             cur.execute("DROP TABLE IF EXISTS metadata CASCADE")
             conn.commit()
 
@@ -86,6 +89,38 @@ class PaperDatabase:
                 """
             conn.cursor().execute(create_papers)
 
+            # Maak questions-tabel (LLM vragen catalogus)
+            create_questions = """
+                CREATE TABLE IF NOT EXISTS questions (
+                    id SERIAL PRIMARY KEY,
+                    question_text VARCHAR(512) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            conn.cursor().execute(create_questions)
+
+            # Unieke index op vraagtekst voor idempotent gedrag
+            conn.cursor().execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_questions_text ON questions(question_text)"
+            )
+
+            # Maak llm_answers-tabel (tussentabel met samengestelde PK)
+            create_llm_answers = """
+                CREATE TABLE IF NOT EXISTS llm_answers (
+                    metadata_id TEXT NOT NULL,
+                    question_id INTEGER NOT NULL,
+                    answer_value BOOLEAN,
+                    confidence_score NUMERIC(3,2),
+                    llm_model VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT pk_llm_answers PRIMARY KEY (metadata_id, question_id),
+                    CONSTRAINT fk_llm_answers_metadata FOREIGN KEY(metadata_id) REFERENCES metadata(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                    CONSTRAINT fk_llm_answers_question FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE ON UPDATE CASCADE
+                )
+                """
+            conn.cursor().execute(create_llm_answers)
+
             # Indexen voor performance
             cur = conn.cursor()
             cur.execute("CREATE INDEX IF NOT EXISTS idx_download_status ON papers(download_status)")
@@ -104,6 +139,14 @@ class PaperDatabase:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_metadata_doi ON metadata(doi)")
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_metadata_created_at ON metadata(created_at)"
+            )
+
+            # Indexen voor questions en llm_answers
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_llm_answers_question_id ON llm_answers(question_id)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_llm_answers_answer_value ON llm_answers(answer_value)"
             )
 
             conn.commit()
@@ -134,16 +177,16 @@ class PaperDatabase:
                     # Metadata tabel kan nog niet bestaan in sommige testsituaties; dan geen koppeling
                     derived_metadata_id = None
 
-            metadata_id_value = explicit_metadata_id if explicit_metadata_id is not None else derived_metadata_id
+            metadata_id_value = (
+                explicit_metadata_id if explicit_metadata_id is not None else derived_metadata_id
+            )
 
-            sql = (
-                """
+            sql = """
                 INSERT INTO papers (
                     arxiv_id, download_status, download_type, llm_check_status,
                     created_at, updated_at, metadata_id
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
-            )
             cur = conn.cursor()
             cur.execute(
                 sql,
@@ -160,6 +203,116 @@ class PaperDatabase:
             conn.commit()
 
         self.logger.info(f"Paper inserted: {paper_data['arxiv_id']}")
+
+    # =============================
+    # Questions & LLM Answers API
+    # =============================
+
+    def get_or_create_question(self, question_text: str) -> int:
+        """Haal het id op voor een vraag, of maak deze aan indien niet bestaand."""
+        if not question_text:
+            raise ValueError("question_text mag niet leeg zijn")
+
+        with self._connect() as conn:
+            cur = conn.cursor()
+            # Probeer te vinden via unieke index
+            cur.execute("SELECT id FROM questions WHERE question_text = %s", (question_text,))
+            row = cur.fetchone()
+            if row:
+                return int(row["id"])  # dict_row
+
+            # Niet gevonden: insert en retourneer id
+            cur.execute(
+                "INSERT INTO questions (question_text, created_at) VALUES (%s, %s) RETURNING id",
+                (question_text, datetime.now().isoformat()),
+            )
+            new_id = int(cur.fetchone()["id"])  # dict_row
+            conn.commit()
+            return new_id
+
+    def upsert_llm_answer(
+        self,
+        metadata_id: str,
+        question_id: int,
+        answer_value: bool | None,
+        confidence_score: float | None = None,
+        llm_model: str | None = None,
+    ) -> None:
+        """Voeg een LLM antwoord in of werk het bij op (metadata_id, question_id)."""
+        if not metadata_id:
+            raise ValueError("metadata_id is verplicht")
+        if not isinstance(question_id, int) or question_id <= 0:
+            raise ValueError("question_id moet een positief integer zijn")
+
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO llm_answers (
+                    metadata_id, question_id, answer_value, confidence_score, llm_model, created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s
+                )
+                ON CONFLICT (metadata_id, question_id)
+                DO UPDATE SET
+                    answer_value = EXCLUDED.answer_value,
+                    confidence_score = EXCLUDED.confidence_score,
+                    llm_model = EXCLUDED.llm_model,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                (
+                    metadata_id,
+                    question_id,
+                    answer_value,
+                    confidence_score,
+                    llm_model,
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                ),
+            )
+            conn.commit()
+
+    def get_metadata_ids_by_answer(self, question_id: int, answer_value: bool = True) -> List[str]:
+        """Haal lijst met metadata_id's waar het antwoord voor de vraag gelijk is aan answer_value."""
+        if not isinstance(question_id, int) or question_id <= 0:
+            raise ValueError("question_id moet een positief integer zijn")
+
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT metadata_id FROM llm_answers WHERE question_id = %s AND answer_value = %s",
+                (question_id, answer_value),
+            )
+            return [row["metadata_id"] for row in cur.fetchall()]
+
+    def get_metadata_ids_by_date_and_answer(
+        self,
+        question_id: int,
+        answer_value: bool = True,
+        date_from: str | None = None,
+    ) -> List[str]:
+        """Selecteer metadata ids op basis van optionele datumfilter (metadata.update_date) en LLM antwoord.
+
+        - date_from: string in formaat YYYY-MM-DD; indien None, geen datumfilter.
+        """
+        if not isinstance(question_id, int) or question_id <= 0:
+            raise ValueError("question_id moet een positief integer zijn")
+
+        base_sql = (
+            "SELECT la.metadata_id FROM llm_answers la "
+            "INNER JOIN metadata m ON m.id = la.metadata_id "
+            "WHERE la.question_id = %s AND la.answer_value = %s"
+        )
+        params: list = [question_id, answer_value]
+        if date_from:
+            base_sql += " AND m.update_date > CAST(%s AS DATE)"
+            params.append(date_from)
+        base_sql += " ORDER BY m.update_date DESC"
+
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(base_sql, tuple(params))
+            return [row["metadata_id"] for row in cur.fetchall()]
 
     def get_papers_by_status(
         self, download_status: str = None, download_type: str = None, llm_status: str = None
@@ -251,7 +404,9 @@ class PaperDatabase:
                 GROUP BY download_status
             """
             )
-            stats["download_status"] = {row["download_status"]: row["count"] for row in cur.fetchall()}
+            stats["download_status"] = {
+                row["download_status"]: row["count"] for row in cur.fetchall()
+            }
 
             # Download type breakdown
             cur.execute(
@@ -495,7 +650,9 @@ class PaperDatabase:
             stats["total_metadata"] = cur.fetchone()["count"]
 
             # Records with DOI
-            cur.execute("SELECT COUNT(1) AS count FROM metadata WHERE doi IS NOT NULL AND doi != ''")
+            cur.execute(
+                "SELECT COUNT(1) AS count FROM metadata WHERE doi IS NOT NULL AND doi != ''"
+            )
             stats["with_doi"] = cur.fetchone()["count"]
 
             # Records without submitter

@@ -134,7 +134,9 @@ def _build_arxiv_id_from_metadata(meta_id: str, versions: object) -> str:
     return f"{meta_id}{suffix}"
 
 
-def prepare_paper_from_metadata(db_path: Optional[str] = None, batch_size: int = 5000, limit: Optional[int] = None) -> int:
+def prepare_paper_from_metadata(
+    db_path: Optional[str] = None, batch_size: int = 5000, limit: Optional[int] = None
+) -> int:
     """Maak paper-records aan voor alle metadata records.
 
     - arxiv_id: concateneer metadata.id met laatste versie uit "versions" (bv. 2510.01576v2)

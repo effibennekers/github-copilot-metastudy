@@ -5,7 +5,6 @@
 PYTHON = python3
 VENV_DIR = venv
 VENV_PYTHON = $(VENV_DIR)/bin/python
-CLI_SCRIPT = cli.py
 
 # Kleuren voor output
 GREEN = \033[0;32m
@@ -62,33 +61,33 @@ $(VENV_DIR)/bin/activate: requirements.txt
 .PHONY: status
 status: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📊 Checking database status...$(NC)"
-	$(VENV_PYTHON) $(CLI_SCRIPT) status
+	$(VENV_PYTHON) -c "from src.main import print_stats; print_stats()"
 
 .PHONY: search
 search: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🔍 Starting paper search and indexing...$(NC)"
-	$(VENV_PYTHON) $(CLI_SCRIPT) search
+	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.arxiv_client import ArxivClient; from src.main import search_and_index_papers; logger=logging.getLogger('src'); db=PaperDatabase(); client=ArxivClient(); search_and_index_papers(db, client, logger)"
 
 .PHONY: download
 download: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)⬇️  Starting PDF downloads...$(NC)"
-	$(VENV_PYTHON) $(CLI_SCRIPT) download
+	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.arxiv_client import ArxivClient; from src.main import download_pdfs; logger=logging.getLogger('src'); db=PaperDatabase(); client=ArxivClient(); download_pdfs(db, client, logger)"
 
 .PHONY: convert
 convert: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📝 Starting PDF to Markdown conversion...$(NC)"
-	$(VENV_PYTHON) $(CLI_SCRIPT) convert
+	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.main import convert_to_markdown; logger=logging.getLogger('src'); db=PaperDatabase(); convert_to_markdown(db, logger)"
 
 .PHONY: llm
 llm: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🤖 Starting LLM quality check...$(NC)"
 	@echo "$(YELLOW)💡 Note: LLM requires Ollama server running$(NC)"
-	$(VENV_PYTHON) $(CLI_SCRIPT) llm
+	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.llm import LLMChecker; from src.main import llm_quality_check; logger=logging.getLogger('src'); db=PaperDatabase(); checker=LLMChecker(); llm_quality_check(db, checker, logger)"
 
 .PHONY: pipeline
 pipeline: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🚀 Starting complete pipeline...$(NC)"
-	$(VENV_PYTHON) $(CLI_SCRIPT) pipeline
+	$(VENV_PYTHON) -m src.main
 
 .PHONY: import
 import: $(VENV_DIR)/bin/activate

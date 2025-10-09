@@ -1,24 +1,22 @@
 """
 LLM Checker voor GitHub Copilot Metastudy
-Gebruikt Ollama voor kwaliteitscontrole en verbetering van Markdown bestanden
+Gebruikt Ollama voor binaire classificatie op basis van titel en abstract.
 """
 
-import requests
+import json
+import ollama
 import logging
-from typing import Optional, Tuple  # noqa: F401
-from pathlib import Path
+from typing import Optional, Tuple, Dict, Any  # noqa: F401
 
 # Import configuratie
 from src.config import LLM_CONFIG
 
 
 class LLMChecker:
-    def __init__(self, ollama_url: str = None, model_name: str = None):
+    def __init__(self):
         self.config = LLM_CONFIG
-        self.ollama_url = ollama_url or self.config.get(
-            "ollama_api_base_url", "http://localhost:11434"
-        )
-        self.model_name = model_name or self.config.get("model_name", "llama3.2")
+        self.ollama_url = self.config.get("ollama_api_base_url", "http://localhost:11434")
+        self.model_name = self.config.get("model_name", "llama3.2")
         self.logger = logging.getLogger(__name__)
 
         # Check if LLM is enabled
@@ -33,196 +31,196 @@ class LLMChecker:
         """Check if LLM functionality is enabled"""
         return self.config.get("enabled", False)
 
-    def check_ollama_availability(self) -> bool:
-        """Check if Ollama server is available"""
-        try:
-            response = requests.get(f"{self.ollama_url}/api/tags", timeout=5)
-            if response.status_code == 200:
-                models = response.json().get("models", [])
-                model_names = [model.get("name", "") for model in models]
+    def _build_messages(self, question: str, title: str, abstract: str) -> list[dict]:
+        system_msg = (
+            "Respond strictly in JSON with the following schema: "
+            '{"answer": true|false, "confidence": number between 0 and 1}. '
+            "No extra text or explanation."
+        )
+        user_msg = f"QUESTION: {question}\n\nTITLE: {title}\n\nABSTRACT: {abstract}"
+        return [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ]
 
-                if any(self.model_name in name for name in model_names):
-                    self.logger.info(f"Ollama server available with model {self.model_name}")
-                    return True
-                else:
-                    self.logger.warning(
-                        f"Model {self.model_name} not found. Available models: {model_names}"
-                    )
-                    return False
-            else:
-                self.logger.error(f"Ollama server responded with status {response.status_code}")
+    def _chat(self, messages: list[dict]) -> str:
+        client = ollama.Client(host=self.ollama_url)
+        response = client.chat(
+            model=self.model_name,
+            messages=messages,
+            options={
+                "temperature": self.config.get("temperature", 0.1),
+                "num_predict": self.config.get("max_tokens", 512),
+            },
+        )
+        return ((response or {}).get("message") or {}).get("content", "").strip()
+
+    def _parse_answer(self, text: str) -> Optional[bool]:
+        # Probeer strikt JSON met veld 'answer' te lezen
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                return self._coerce_answer_bool(obj.get("answer"))
+        except Exception:
+            pass
+        # Fallback: herken losse of ingesloten true/false patronen
+        embedded = self._contains_true_false(text)
+        if embedded is not None:
+            return embedded
+        # Laatste poging: direct coerce van gehele string
+        return self._coerce_answer_bool(text)
+
+    def _parse_structured(self, text: str) -> Tuple[Optional[bool], Optional[float]]:
+        """Parseer JSON met velden {answer: bool|str, confidence: number}.
+
+        Retourneert (answer_bool|None, confidence|None) waarbij confidence in [0,1] is geschaald.
+        """
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                ans_val = self._coerce_answer_bool(obj.get("answer"))
+                conf_val = self._coerce_confidence(
+                    obj.get("confidence") if "confidence" in obj else obj.get("confidence_score")
+                )
+                return ans_val, conf_val
+        except Exception:
+            pass
+
+        # Fallback op enkel answer parsing
+        return self._parse_answer(text), None
+
+    # ============================
+    # DRY helpers
+    # ============================
+
+    def _coerce_answer_bool(self, value: Any) -> Optional[bool]:
+        if isinstance(value, bool):
+            return bool(value)
+        if isinstance(value, str):
+            low = value.strip().lower()
+            if low in ("true", "yes", "ja"):  # taal-agnostisch
+                return True
+            if low in ("false", "no", "nee"):
                 return False
+        return None
 
-        except Exception as e:
-            self.logger.error(f"Cannot connect to Ollama server: {e}")
+    def _contains_true_false(self, text: str) -> Optional[bool]:
+        low = (text or "").strip().lower()
+        if '"answer": true' in low or "\ntrue\n" in low or low == "true":
+            return True
+        if '"answer": false' in low or "\nfalse\n" in low or low == "false":
             return False
+        return None
 
-    def check_and_fix_markdown(self, md_content: str, arxiv_id: str) -> Tuple[str, str]:
+    def _coerce_confidence(self, value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            conf = float(value)
+        except Exception:
+            return None
+        if conf > 1.0 and conf <= 100.0:
+            conf = conf / 100.0
+        conf = max(0.0, min(1.0, conf))
+        return conf
+
+    def _default_structured(self) -> Dict[str, object]:
+        return {"answer_value": None, "confidence_score": None, "llm_model": self.model_name}
+
+    def _extract_title_abstract(self, metadata_record: dict) -> Tuple[str, str]:
+        title = (metadata_record or {}).get("title") or ""
+        abstract = (metadata_record or {}).get("abstract") or ""
+        return title, abstract
+
+    def classify_title_abstract_structured(
+        self, question: str, title: str, abstract: str
+    ) -> Dict[str, object]:
         """
-        Check en verbeter Markdown met lokale LLM
-        Returns: (improved_content, status)
-        Status can be: 'CLEAN', 'FIXED', 'FAILED'
+        Gestructureerde classificatie met binaire answer plus extra waarden.
+
+        Returns:
+            dict: {
+              "answer_value": bool|None,
+              "confidence_score": float|None,  # binnen [0,1]
+              "llm_model": str,
+            }
         """
+        result = self._default_structured()
         if not self.is_enabled():
-            self.logger.info(f"LLM checker disabled, marking {arxiv_id} as CLEAN")
-            return md_content, "CLEAN"
+            self.logger.info("LLM checker disabled; returning default structured result")
+            result["answer_value"] = False
+            return result
 
-        if not self.check_ollama_availability():
-            self.logger.error(f"Ollama not available, marking {arxiv_id} as FAILED")
-            return md_content, "FAILED"
-
-        # Prepare prompt based on configuration
-        prompt_template = self.config.get("prompt_template", self._get_default_prompt())
-
-        # Truncate content if too long to avoid token limits
-        max_tokens = self.config.get("max_tokens", 4000)
-        if len(md_content) > max_tokens * 3:  # Rough estimate: 1 token ≈ 3 chars
-            self.logger.warning(f"Content too long for {arxiv_id}, truncating...")
-            md_content = md_content[: max_tokens * 3]
-
-        full_prompt = f"{prompt_template}\n\nTEKST:\n{md_content}"
+        if not title or not abstract or not question:
+            self.logger.warning(
+                "Missing question/title/abstract; returning default structured result"
+            )
+            result["answer_value"] = False
+            return result
 
         try:
-            self.logger.info(f"Sending {arxiv_id} to LLM for quality check...")
+            messages = self._build_messages(question=question, title=title, abstract=abstract)
+            self.logger.info("Calling Ollama for structured classification")
+            content = self._chat(messages)
+            ans, conf = self._parse_structured(content)
+            if ans is None:
+                self.logger.warning("Unclear LLM response; defaulting answer to False")
+                ans = False
+            result["answer_value"] = bool(ans)
+            result["confidence_score"] = conf
+            return result
+        except Exception as exc:
+            self.logger.error("LLM classification failed: %s", exc)
+            result["answer_value"] = False
+            return result
 
-            response = requests.post(
-                f"{self.ollama_url}/api/generate",
-                json={
-                    "model": self.model_name,
-                    "prompt": full_prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": self.config.get("temperature", 0.1),
-                        "num_predict": max_tokens,
-                    },
-                },
-                timeout=self.config.get("timeout_seconds", 120),
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                improved_content = result.get("response", "").strip()
-
-                # Sanity checks
-                if not improved_content:
-                    self.logger.warning(f"Empty LLM response for {arxiv_id}")
-                    return md_content, "FAILED"
-
-                # Check if response is reasonable (not too short or too different)
-                original_length = len(md_content)
-                improved_length = len(improved_content)
-
-                if improved_length < original_length * 0.5:
-                    self.logger.warning(
-                        "LLM response too short for %s (%s vs %s chars)",
-                        arxiv_id,
-                        improved_length,
-                        original_length,
-                    )
-                    return md_content, "CLEAN"
-
-                if improved_length > original_length * 2:
-                    self.logger.warning(
-                        "LLM response too long for %s (%s vs %s chars)",
-                        arxiv_id,
-                        improved_length,
-                        original_length,
-                    )
-                    return md_content, "CLEAN"
-
-                # Check if content was actually improved
-                if improved_content.strip() == md_content.strip():
-                    self.logger.info(f"No improvements needed for {arxiv_id}")
-                    return md_content, "CLEAN"
-                else:
-                    self.logger.info(
-                        f"Successfully improved {arxiv_id} ({original_length} → {improved_length} chars)"
-                    )
-                    return improved_content, "FIXED"
-
-            else:
-                self.logger.error(f"LLM API error for {arxiv_id}: HTTP {response.status_code}")
-                return md_content, "FAILED"
-
-        except requests.exceptions.Timeout:
-            self.logger.error(f"LLM request timeout for {arxiv_id}")
-            return md_content, "FAILED"
-        except Exception as e:
-            self.logger.error(f"LLM check failed for {arxiv_id}: {e}")
-            return md_content, "FAILED"
-
-    def _get_default_prompt(self) -> str:
-        """Get default prompt for markdown improvement"""
-        return """Je bent een expert in het controleren van academische papers die zijn geconverteerd van PDF naar Markdown.
-
-Controleer de volgende Markdown tekst op:
-1. Verkeerde koppen (# ## ###) - zorg dat ze logisch genest zijn
-2. Gebroken tabellen - herstel tabel formatting
-3. Foute lijstopmaak - corrigeer genummerde en bullet lists
-4. Referentie formatting - zorg voor correcte [1], [2] notatie
-5. Figuur/tabel captions - herstel "Figure 1:", "Table 2:" formatting
-6. Paragraaf structuur - voeg ontbrekende line breaks toe
-7. Code blocks - zorg voor correcte ``` formatting
-8. Mathematical formulas - behoud LaTeX notatie waar mogelijk
-
-BELANGRIJKE REGELS:
-- Behoud ALLE originele inhoud en betekenis
-- Verander GEEN wetenschappelijke termen of concepten
-- Voeg GEEN nieuwe informatie toe
-- Focus alleen op Markdown opmaak verbetering
-- Als de tekst al goed geformatteerd is, verander dan niets
-
-Antwoord ALLEEN met de gecorrigeerde Markdown, geen extra uitleg of commentaar."""
-
-    def process_batch(self, papers_data: list) -> dict:
+    def classify_title_abstract_boolean(self, question: str, title: str, abstract: str) -> bool:
         """
-        Process multiple papers in batch
-        Returns: {'processed': int, 'fixed': int, 'failed': int, 'clean': int}
+        Beantwoord een binaire vraag over een paper op basis van titel en abstract.
+
+        Returns:
+            bool: True als het antwoord 'ja' is, anders False.
         """
-        stats = {"processed": 0, "fixed": 0, "failed": 0, "clean": 0}
+        structured = self.classify_title_abstract_structured(
+            question=question, title=title, abstract=abstract
+        )
+        return bool(structured.get("answer_value") or False)
 
-        if not self.is_enabled():
-            self.logger.info("LLM checker disabled, skipping batch processing")
-            return stats
+    def classify_metadata_record_boolean(self, question: str, metadata_record: dict) -> bool:
+        """
+        Convenience: classificeer rechtstreeks een metadata-record met 'title' en 'abstract'.
+        """
+        if not isinstance(metadata_record, dict):
+            self.logger.error("metadata_record must be a dict")
+            return False
+        title = metadata_record.get("title") or ""
+        abstract = metadata_record.get("abstract") or ""
+        if not title or not abstract:
+            self.logger.warning("metadata_record mist 'title' of 'abstract'")
+            return False
+        return self.classify_title_abstract_boolean(
+            question=question, title=title, abstract=abstract
+        )
 
-        for paper_data in papers_data:
-            arxiv_id = paper_data.get("arxiv_id")
-            md_path = paper_data.get("md_path")
+    def classify_metadata_record_structured(
+        self, question: str, metadata_record: dict
+    ) -> Dict[str, object]:
+        """
+        Gestructureerde classificatie direct op een metadata-record met 'title' en 'abstract'.
+        """
+        if not isinstance(metadata_record, dict):
+            self.logger.error("metadata_record must be a dict")
+            return {"answer_value": False, "confidence_score": None, "llm_model": self.model_name}
+        title, abstract = self._extract_title_abstract(metadata_record)
+        if not title or not abstract:
+            self.logger.warning("metadata_record mist 'title' of 'abstract'")
+            return {"answer_value": False, "confidence_score": None, "llm_model": self.model_name}
+        return self.classify_title_abstract_structured(
+            question=question, title=title, abstract=abstract
+        )
 
-            if not md_path or not Path(md_path).exists():
-                self.logger.warning(f"No markdown file found for {arxiv_id}")
-                continue
-
-            try:
-                # Read markdown content
-                with open(md_path, "r", encoding="utf-8") as f:
-                    md_content = f.read()
-
-                # Process with LLM
-                improved_content, status = self.check_and_fix_markdown(md_content, arxiv_id)
-
-                # Save improved version if fixed
-                if status == "FIXED":
-                    # Create backup first
-                    backup_path = Path(md_path).with_suffix(".md.backup")
-                    with open(backup_path, "w", encoding="utf-8") as f:
-                        f.write(md_content)
-
-                    # Save improved version
-                    with open(md_path, "w", encoding="utf-8") as f:
-                        f.write(improved_content)
-
-                    self.logger.info(
-                        f"Saved improved version for {arxiv_id} (backup: {backup_path})"
-                    )
-
-                # Update stats
-                stats["processed"] += 1
-                stats[status.lower()] += 1
-
-            except Exception as e:
-                self.logger.error(f"Error processing {arxiv_id}: {e}")
-                stats["failed"] += 1
-
-        self.logger.info(f"Batch processing complete: {stats}")
-        return stats
+    def is_about_github_copilot(self, title: str, abstract: str) -> bool:
+        """Convenience: vaste vraag of het over GitHub Copilot gaat."""
+        return self.classify_title_abstract_boolean(
+            question="Is this about GitHub Copilot?", title=title, abstract=abstract
+        )

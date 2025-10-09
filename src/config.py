@@ -113,7 +113,7 @@ LLM_CONFIG = {
         "2. Gebroken tabellen - herstel tabel formatting\n"
         "3. Foute lijstopmaak - corrigeer genummerde en bullet lists\n"
         "4. Referentie formatting - zorg voor correcte [1], [2] notatie\n"
-        "5. Figuur/tabel captions - herstel \"Figure 1:\", \"Table 2:\" formatting\n"
+        '5. Figuur/tabel captions - herstel "Figure 1:", "Table 2:" formatting\n'
         "6. Paragraaf structuur - voeg ontbrekende line breaks toe\n"
         "7. Code blocks - zorg voor correcte ``` formatting\n"
         "8. Mathematical formulas - behoud LaTeX notatie waar mogelijk\n\n"
