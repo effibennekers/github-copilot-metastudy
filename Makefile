@@ -32,6 +32,7 @@ help:
 	@echo "  llm       - Voer LLM kwaliteitscontrole uit"
 	@echo "  pipeline  - Voer volledige pipeline uit (alle stappen)"
 	@echo "  import    - Importeer metadata JSON met schema-validatie"
+	@echo "  prepare   - Maak papers aan op basis van metadata"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
 	@echo "  test      - Voer unit tests uit"
@@ -102,6 +103,21 @@ import: $(VENV_DIR)/bin/activate
 		  ARGS="$$ARGS batch_size=int('$(BATCH)')"; \
 		fi; \
 		$(VENV_PYTHON) -c "from src.main import run_metadata_import; run_metadata_import($$ARGS)"; \
+	fi
+
+.PHONY: prepare
+prepare: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🧩 Preparing paper records from metadata...$(NC)"
+	@if [ -z "$(BATCH)" ] && [ -z "$(LIMIT)" ]; then \
+		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation()"; \
+	else \
+		ARGS=""; \
+		if [ -n "$(BATCH)" ]; then ARGS="batch_size=int('$(BATCH)')"; fi; \
+		if [ -n "$(LIMIT)" ]; then \
+		  if [ -n "$$ARGS" ]; then ARGS="$$ARGS, "; fi; \
+		  ARGS="$$ARGS limit=int('$(LIMIT)')"; \
+		fi; \
+		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation($$ARGS)"; \
 	fi
 
 # Development commands

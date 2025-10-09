@@ -339,6 +339,29 @@ def run_metadata_import(
     return count
 
 
+def run_paper_preparation(batch_size: int | None = None, limit: int | None = None, db_path: str | None = None) -> int:
+    """Maak paper records aan op basis van bestaande metadata records.
+
+    Roept `prepare_paper_from_metadata` aan uit `src.database.import`.
+    """
+    logging.config.dictConfig(LOGGING_CONFIG)
+    logger = logging.getLogger(__name__)
+
+    db_import = import_module("src.database.import")
+
+    kwargs = {}
+    if batch_size is not None:
+        kwargs["batch_size"] = int(batch_size)
+    if limit is not None:
+        kwargs["limit"] = int(limit)
+    if db_path is not None:
+        kwargs["db_path"] = db_path
+
+    logger.info("🧩 Paper preparation from metadata start")
+    created = db_import.prepare_paper_from_metadata(**kwargs)
+    logger.info("✅ Paper preparation voltooid: %s records aangemaakt", created)
+    return created
+
 def main():
     """Hoofd workflow voor metastudy"""
     # Setup logging first
