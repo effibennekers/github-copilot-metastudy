@@ -49,10 +49,38 @@ class PaperDatabase:
                 )
             """)
             
+            # Create metadata table based on metadataschema.json
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS metadata (
+                    id TEXT PRIMARY KEY,  -- arXiv ID (e.g., "2510.01576v1")
+                    submitter TEXT,  -- Can be null
+                    authors TEXT NOT NULL,  -- Author names as string
+                    title TEXT NOT NULL,  -- Paper title
+                    comments TEXT,  -- Optional comments (can be null)
+                    journal_ref TEXT,  -- Journal reference (can be null)  
+                    doi TEXT,  -- DOI (can be null)
+                    report_no TEXT,  -- Report number (can be null)
+                    categories TEXT NOT NULL,  -- Categories as string
+                    license TEXT,  -- License (can be null)
+                    abstract TEXT NOT NULL,  -- Paper abstract
+                    versions TEXT NOT NULL,  -- JSON array of versions (minified)
+                    update_date TEXT NOT NULL,  -- Last update date
+                    authors_parsed TEXT NOT NULL,  -- JSON array of parsed authors (minified)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             # Create indexes for better performance
             conn.execute("CREATE INDEX IF NOT EXISTS idx_download_status ON papers(download_status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_llm_status ON papers(llm_check_status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON papers(created_at)")
+            
+            # Create indexes for metadata table
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metadata_categories ON metadata(categories)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metadata_update_date ON metadata(update_date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metadata_doi ON metadata(doi)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metadata_created_at ON metadata(created_at)")
             
             conn.commit()
             
@@ -236,3 +264,135 @@ class PaperDatabase:
                     paper['categories'] = json.loads(paper['categories'])
                 papers.append(paper)
             return papers
+    
+    def metadata_exists(self, metadata_id: str) -> bool:
+        """Check of metadata record al in database staat"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT 1 FROM metadata WHERE id = ?", 
+                (metadata_id,)
+            )
+            return cursor.fetchone() is not None
+    
+    def insert_metadata(self, metadata_record: Dict) -> None:
+        """Voeg nieuw metadata record toe aan database"""
+        # Convert arrays to minified JSON strings
+        versions_json = json.dumps(metadata_record.get('versions', []), separators=(',', ':'))
+        authors_parsed_json = json.dumps(metadata_record.get('authors_parsed', []), separators=(',', ':'))
+        
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT INTO metadata (
+                    id, submitter, authors, title, comments, journal_ref, doi, report_no,
+                    categories, license, abstract, versions, update_date, authors_parsed,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                metadata_record['id'],
+                metadata_record.get('submitter'),  # Can be null
+                metadata_record['authors'],
+                metadata_record['title'],
+                metadata_record.get('comments'),  # Can be null
+                metadata_record.get('journal-ref'),  # Can be null (note hyphen)
+                metadata_record.get('doi'),  # Can be null
+                metadata_record.get('report-no'),  # Can be null (note hyphen)
+                metadata_record['categories'],
+                metadata_record.get('license'),  # Can be null
+                metadata_record['abstract'],
+                versions_json,
+                metadata_record['update_date'],
+                authors_parsed_json,
+                datetime.now().isoformat(),
+                datetime.now().isoformat()
+            ))
+            conn.commit()
+            
+        self.logger.info(f"Metadata inserted: {metadata_record['id']}")
+    
+    def get_metadata_by_id(self, metadata_id: str) -> Optional[Dict]:
+        """Haal specifiek metadata record op via id"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM metadata WHERE id = ?", 
+                (metadata_id,)
+            )
+            
+            row = cursor.fetchone()
+            if row:
+                metadata = dict(row)
+                # Parse JSON fields back to Python objects
+                if metadata['versions']:
+                    metadata['versions'] = json.loads(metadata['versions'])
+                if metadata['authors_parsed']:
+                    metadata['authors_parsed'] = json.loads(metadata['authors_parsed'])
+                return metadata
+            
+            return None
+    
+    def get_metadata_by_category(self, category: str) -> List[Dict]:
+        """Zoek metadata records op basis van categorie"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM metadata WHERE categories LIKE ? ORDER BY update_date DESC",
+                (f'%{category}%',)
+            )
+            records = []
+            for row in cursor.fetchall():
+                metadata = dict(row)
+                # Parse JSON fields back to Python objects
+                if metadata['versions']:
+                    metadata['versions'] = json.loads(metadata['versions'])
+                if metadata['authors_parsed']:
+                    metadata['authors_parsed'] = json.loads(metadata['authors_parsed'])
+                records.append(metadata)
+            return records
+    
+    def get_metadata_statistics(self) -> Dict:
+        """Haal metadata statistieken op"""
+        with sqlite3.connect(self.db_path) as conn:
+            stats = {}
+            
+            # Total metadata records
+            cursor = conn.execute("SELECT COUNT(*) FROM metadata")
+            stats['total_metadata'] = cursor.fetchone()[0]
+            
+            # Records with DOI
+            cursor = conn.execute("SELECT COUNT(*) FROM metadata WHERE doi IS NOT NULL AND doi != ''")
+            stats['with_doi'] = cursor.fetchone()[0]
+            
+            # Records without submitter
+            cursor = conn.execute("SELECT COUNT(*) FROM metadata WHERE submitter IS NULL")
+            stats['null_submitter'] = cursor.fetchone()[0]
+            
+            # Most common categories (top 10)
+            cursor = conn.execute("""
+                SELECT categories, COUNT(*) as count 
+                FROM metadata 
+                GROUP BY categories 
+                ORDER BY count DESC 
+                LIMIT 10
+            """)
+            stats['top_categories'] = dict(cursor.fetchall())
+            
+            return stats
+    
+    def search_metadata_by_title(self, title_search: str) -> List[Dict]:
+        """Zoek metadata records op basis van titel"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM metadata WHERE title LIKE ? ORDER BY update_date DESC",
+                (f'%{title_search}%',)
+            )
+            records = []
+            for row in cursor.fetchall():
+                metadata = dict(row)
+                # Parse JSON fields back to Python objects  
+                if metadata['versions']:
+                    metadata['versions'] = json.loads(metadata['versions'])
+                if metadata['authors_parsed']:
+                    metadata['authors_parsed'] = json.loads(metadata['authors_parsed'])
+                records.append(metadata)
+            return records

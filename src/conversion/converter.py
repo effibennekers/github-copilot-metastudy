@@ -15,6 +15,62 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 
+def _validate_input_file(input_file: str) -> None:
+    """Valideer of input bestand bestaat."""
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Input bestand niet gevonden: {input_file}")
+
+
+def _validate_directory(directory_path: str) -> bool:
+    """Valideer of path een directory is."""
+    if not os.path.exists(directory_path):
+        logger.warning(f"Directory bestaat niet: {directory_path}")
+        return False
+    
+    if not os.path.isdir(directory_path):
+        logger.error(f"Pad is geen directory: {directory_path}")
+        return False
+    
+    return True
+
+
+def _get_output_path(input_file: str, paper_id: str, output_dir: Optional[str] = None) -> str:
+    """Genereer output pad voor markdown bestand."""
+    if output_dir is None:
+        output_dir = os.path.dirname(input_file)
+    return os.path.join(output_dir, f"{paper_id}.md")
+
+
+def _pandoc_convert(input_file: str, output_file: str, from_format: str, to_format: str, format_name: str) -> str:
+    """
+    Voer pandoc conversie uit.
+    
+    Args:
+        input_file: Pad naar input bestand
+        output_file: Pad naar output bestand
+        from_format: Pandoc input formaat
+        to_format: Pandoc output formaat
+        format_name: Naam voor logging (bijv. "TeX", "HTML")
+        
+    Returns:
+        Pad naar het gegenereerde markdown bestand
+        
+    Raises:
+        subprocess.CalledProcessError: Als pandoc conversie faalt
+    """
+    pandoc_options = ["--from", from_format, "--to", to_format]
+    command = ["pandoc", "-s", input_file, "-o", output_file] + pandoc_options
+    
+    try:
+        logger.info(f"Converteer {format_name} naar MD: {input_file} -> {output_file}")
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        logger.debug(f"Pandoc output: {result.stdout}")
+        return output_file
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Pandoc conversie gefaald: {e.stderr}")
+        raise
+
+
 def tex_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = None) -> str:
     """
     Converteer een TeX bestand naar Markdown met pandoc.
@@ -31,25 +87,9 @@ def tex_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = None
         subprocess.CalledProcessError: Als pandoc conversie faalt
         FileNotFoundError: Als input bestand niet bestaat
     """
-    if not os.path.exists(input_file):
-        raise FileNotFoundError(f"Input bestand niet gevonden: {input_file}")
-    
-    if output_dir is None:
-        output_dir = os.path.dirname(input_file)
-    
-    output_file = os.path.join(output_dir, f"{paper_id}.md")
-    
-    pandoc_options = ["--from", "latex", "--to", "markdown+tex_math_dollars"]
-    command = ["pandoc", "-s", input_file, "-o", output_file] + pandoc_options
-    
-    try:
-        logger.info(f"Converteer TeX naar MD: {input_file} -> {output_file}")
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-        logger.debug(f"Pandoc output: {result.stdout}")
-        return output_file
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Pandoc conversie gefaald: {e.stderr}")
-        raise
+    _validate_input_file(input_file)
+    output_file = _get_output_path(input_file, paper_id, output_dir)
+    return _pandoc_convert(input_file, output_file, "latex", "markdown+tex_math_dollars", "TeX")
 
 
 def html_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = None) -> str:
@@ -68,25 +108,9 @@ def html_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = Non
         subprocess.CalledProcessError: Als pandoc conversie faalt
         FileNotFoundError: Als input bestand niet bestaat
     """
-    if not os.path.exists(input_file):
-        raise FileNotFoundError(f"Input bestand niet gevonden: {input_file}")
-    
-    if output_dir is None:
-        output_dir = os.path.dirname(input_file)
-    
-    output_file = os.path.join(output_dir, f"{paper_id}.md")
-    
-    pandoc_options = ["--from", "html", "--to", "markdown"]
-    command = ["pandoc", "-s", input_file, "-o", output_file] + pandoc_options
-    
-    try:
-        logger.info(f"Converteer HTML naar MD: {input_file} -> {output_file}")
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-        logger.debug(f"Pandoc output: {result.stdout}")
-        return output_file
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Pandoc conversie gefaald: {e.stderr}")
-        raise
+    _validate_input_file(input_file)
+    output_file = _get_output_path(input_file, paper_id, output_dir)
+    return _pandoc_convert(input_file, output_file, "html", "markdown", "HTML")
 
 
 def pak_tarball_uit(tarball_path: str, extract_to: Optional[str] = None) -> str:
@@ -104,8 +128,7 @@ def pak_tarball_uit(tarball_path: str, extract_to: Optional[str] = None) -> str:
         FileNotFoundError: Als tarball niet bestaat
         tarfile.TarError: Als er een probleem is met het uitpakken
     """
-    if not os.path.exists(tarball_path):
-        raise FileNotFoundError(f"Tarball niet gevonden: {tarball_path}")
+    _validate_input_file(tarball_path)
     
     if extract_to is None:
         extract_to = os.path.dirname(tarball_path)
@@ -150,12 +173,7 @@ def verwijder_uitgepakte_tarball(extracted_path: str, force: bool = False) -> bo
     Raises:
         OSError: Als er een probleem is met het verwijderen
     """
-    if not os.path.exists(extracted_path):
-        logger.warning(f"Directory bestaat niet: {extracted_path}")
-        return False
-    
-    if not os.path.isdir(extracted_path):
-        logger.error(f"Pad is geen directory: {extracted_path}")
+    if not _validate_directory(extracted_path):
         return False
     
     try:
@@ -196,13 +214,8 @@ def pdf_naar_md(pdf_path: str, paper_id: str, output_dir: Optional[str] = None, 
         FileNotFoundError: Als input bestand niet bestaat
         ImportError: Als pdfplumber niet beschikbaar is
     """
-    if not os.path.exists(pdf_path):
-        raise FileNotFoundError(f"Input PDF niet gevonden: {pdf_path}")
-    
-    if output_dir is None:
-        output_dir = os.path.dirname(pdf_path)
-    
-    output_file = os.path.join(output_dir, f"{paper_id}.md")
+    _validate_input_file(pdf_path)
+    output_file = _get_output_path(pdf_path, paper_id, output_dir)
     
     # Check of Markdown al bestaat en geldig is
     if os.path.exists(output_file):
