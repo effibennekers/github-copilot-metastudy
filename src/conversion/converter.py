@@ -4,13 +4,10 @@ Converter functies voor bestandsconversie en tarball-beheer.
 
 import subprocess
 import os
-import sys
 import tarfile
 import shutil
-from pathlib import Path
 from typing import Optional
 import logging
-import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +23,11 @@ def _validate_directory(directory_path: str) -> bool:
     if not os.path.exists(directory_path):
         logger.warning(f"Directory bestaat niet: {directory_path}")
         return False
-    
+
     if not os.path.isdir(directory_path):
         logger.error(f"Pad is geen directory: {directory_path}")
         return False
-    
+
     return True
 
 
@@ -41,26 +38,28 @@ def _get_output_path(input_file: str, paper_id: str, output_dir: Optional[str] =
     return os.path.join(output_dir, f"{paper_id}.md")
 
 
-def _pandoc_convert(input_file: str, output_file: str, from_format: str, to_format: str, format_name: str) -> str:
+def _pandoc_convert(
+    input_file: str, output_file: str, from_format: str, to_format: str, format_name: str
+) -> str:
     """
     Voer pandoc conversie uit.
-    
+
     Args:
         input_file: Pad naar input bestand
         output_file: Pad naar output bestand
         from_format: Pandoc input formaat
         to_format: Pandoc output formaat
         format_name: Naam voor logging (bijv. "TeX", "HTML")
-        
+
     Returns:
         Pad naar het gegenereerde markdown bestand
-        
+
     Raises:
         subprocess.CalledProcessError: Als pandoc conversie faalt
     """
     pandoc_options = ["--from", from_format, "--to", to_format]
     command = ["pandoc", "-s", input_file, "-o", output_file] + pandoc_options
-    
+
     try:
         logger.info(f"Converteer {format_name} naar MD: {input_file} -> {output_file}")
         result = subprocess.run(command, check=True, capture_output=True, text=True)
@@ -74,15 +73,15 @@ def _pandoc_convert(input_file: str, output_file: str, from_format: str, to_form
 def tex_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = None) -> str:
     """
     Converteer een TeX bestand naar Markdown met pandoc.
-    
+
     Args:
         input_file: Pad naar het input TeX bestand
         paper_id: ID van het paper voor de output filename
         output_dir: Directory voor output, standaard hetzelfde als input
-        
+
     Returns:
         Pad naar het gegenereerde markdown bestand
-        
+
     Raises:
         subprocess.CalledProcessError: Als pandoc conversie faalt
         FileNotFoundError: Als input bestand niet bestaat
@@ -95,15 +94,15 @@ def tex_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = None
 def html_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = None) -> str:
     """
     Converteer een HTML bestand naar Markdown met pandoc.
-    
+
     Args:
         input_file: Pad naar het input HTML bestand
         paper_id: ID van het paper voor de output filename
         output_dir: Directory voor output, standaard hetzelfde als input
-        
+
     Returns:
         Pad naar het gegenereerde markdown bestand
-        
+
     Raises:
         subprocess.CalledProcessError: Als pandoc conversie faalt
         FileNotFoundError: Als input bestand niet bestaat
@@ -116,44 +115,44 @@ def html_naar_md(input_file: str, paper_id: str, output_dir: Optional[str] = Non
 def pak_tarball_uit(tarball_path: str, extract_to: Optional[str] = None) -> str:
     """
     Pak een tarball uit naar een directory.
-    
+
     Args:
         tarball_path: Pad naar het tarball bestand
         extract_to: Directory om naar uit te pakken, standaard parent directory van tarball
-        
+
     Returns:
         Pad naar de uitgepakte directory
-        
+
     Raises:
         FileNotFoundError: Als tarball niet bestaat
         tarfile.TarError: Als er een probleem is met het uitpakken
     """
     _validate_input_file(tarball_path)
-    
+
     if extract_to is None:
         extract_to = os.path.dirname(tarball_path)
-    
+
     # Maak extract directory als het niet bestaat
     os.makedirs(extract_to, exist_ok=True)
-    
+
     try:
         logger.info(f"Pak tarball uit: {tarball_path} -> {extract_to}")
-        
-        with tarfile.open(tarball_path, 'r:*') as tar:
+
+        with tarfile.open(tarball_path, "r:*") as tar:
             # Krijg de root directory naam uit de tarball
             members = tar.getnames()
             if members:
-                root_dir = members[0].split('/')[0]
+                root_dir = members[0].split("/")[0]
                 extract_path = os.path.join(extract_to, root_dir)
             else:
                 extract_path = extract_to
-            
+
             # Pak uit
             tar.extractall(path=extract_to)
-            
+
             logger.info(f"Tarball uitgepakt naar: {extract_path}")
             return extract_path
-            
+
     except tarfile.TarError as e:
         logger.error(f"Fout bij uitpakken tarball: {e}")
         raise
@@ -162,23 +161,23 @@ def pak_tarball_uit(tarball_path: str, extract_to: Optional[str] = None) -> str:
 def verwijder_uitgepakte_tarball(extracted_path: str, force: bool = False) -> bool:
     """
     Verwijder een uitgepakte tarball directory.
-    
+
     Args:
         extracted_path: Pad naar de uitgepakte directory
         force: Of directory geforceerd verwijderd moet worden (ook bij non-empty)
-        
+
     Returns:
         True als succesvol verwijderd, False anders
-        
+
     Raises:
         OSError: Als er een probleem is met het verwijderen
     """
     if not _validate_directory(extracted_path):
         return False
-    
+
     try:
         logger.info(f"Verwijder uitgepakte directory: {extracted_path}")
-        
+
         if force:
             shutil.rmtree(extracted_path)
         else:
@@ -188,35 +187,37 @@ def verwijder_uitgepakte_tarball(extracted_path: str, force: bool = False) -> bo
             except OSError:
                 # Als niet leeg, verwijder alles
                 shutil.rmtree(extracted_path)
-        
+
         logger.info(f"Directory succesvol verwijderd: {extracted_path}")
         return True
-        
+
     except OSError as e:
         logger.error(f"Fout bij verwijderen directory: {e}")
         raise
 
 
-def pdf_naar_md(pdf_path: str, paper_id: str, output_dir: Optional[str] = None, min_size_bytes: int = 1000) -> Optional[str]:
+def pdf_naar_md(
+    pdf_path: str, paper_id: str, output_dir: Optional[str] = None, min_size_bytes: int = 1000
+) -> Optional[str]:
     """
     Converteer een PDF bestand naar Markdown met pdfplumber.
-    
+
     Args:
         pdf_path: Pad naar het input PDF bestand
         paper_id: ID van het paper voor de output filename
         output_dir: Directory voor output, standaard hetzelfde als input
         min_size_bytes: Minimale grootte voor geldig markdown bestand
-        
+
     Returns:
         Pad naar het gegenereerde markdown bestand, of None bij falen
-        
+
     Raises:
         FileNotFoundError: Als input bestand niet bestaat
         ImportError: Als pdfplumber niet beschikbaar is
     """
     _validate_input_file(pdf_path)
     output_file = _get_output_path(pdf_path, paper_id, output_dir)
-    
+
     # Check of Markdown al bestaat en geldig is
     if os.path.exists(output_file):
         file_size = os.path.getsize(output_file)
@@ -226,51 +227,53 @@ def pdf_naar_md(pdf_path: str, paper_id: str, output_dir: Optional[str] = None, 
         else:
             logger.warning(f"Bestaande markdown te klein, herconverteren: {output_file}")
             os.unlink(output_file)
-    
+
     try:
         logger.info(f"Converteer PDF naar MD: {pdf_path} -> {output_file}")
         return _convert_with_pdfplumber(pdf_path, output_file, paper_id, min_size_bytes)
-        
+
     except Exception as e:
         logger.error(f"PDF naar Markdown conversie gefaald voor {paper_id}: {e}")
         return None
 
 
-def _convert_with_pdfplumber(pdf_path: str, md_path: str, paper_id: str, min_size_bytes: int) -> Optional[str]:
+def _convert_with_pdfplumber(
+    pdf_path: str, md_path: str, paper_id: str, min_size_bytes: int
+) -> Optional[str]:
     """
     Converteer PDF naar Markdown met pdfplumber.
-    
+
     Args:
         pdf_path: Pad naar het input PDF bestand
-        md_path: Pad naar het output Markdown bestand  
+        md_path: Pad naar het output Markdown bestand
         paper_id: ID van het paper
         min_size_bytes: Minimale grootte voor geldig bestand
-        
+
     Returns:
         Pad naar het gegenereerde markdown bestand, of None bij falen
-        
+
     Raises:
         ImportError: Als pdfplumber niet beschikbaar is
     """
     try:
         import pdfplumber
-        
+
         with pdfplumber.open(pdf_path) as pdf:
             text_content = []
-            
+
             for page_num, page in enumerate(pdf.pages):
                 text = page.extract_text()
                 if text:
                     text_content.append(f"## Page {page_num + 1}\n\n{text}\n\n")
-            
+
             if text_content:
                 markdown_content = f"# {paper_id}\n\n" + "".join(text_content)
-                
-                with open(md_path, 'w', encoding='utf-8') as f:
+
+                with open(md_path, "w", encoding="utf-8") as f:
                     f.write(markdown_content)
-                
+
                 file_size = os.path.getsize(md_path)
-                
+
                 if file_size >= min_size_bytes:
                     logger.info(f"PDFPlumber conversie succesvol: {md_path} ({file_size} bytes)")
                     return md_path
@@ -282,7 +285,7 @@ def _convert_with_pdfplumber(pdf_path: str, md_path: str, paper_id: str, min_siz
             else:
                 logger.error(f"Geen tekst geëxtraheerd uit PDF: {paper_id}")
                 return None
-                
+
     except ImportError:
         logger.error("pdfplumber niet beschikbaar - installeer met: pip install pdfplumber")
         raise

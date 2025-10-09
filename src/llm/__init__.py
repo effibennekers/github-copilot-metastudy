@@ -5,4 +5,4 @@ Handles kwaliteitscontrole en verbetering van Markdown bestanden
 
 from .checker import LLMChecker
 
-__all__ = ['LLMChecker']
+__all__ = ["LLMChecker"]

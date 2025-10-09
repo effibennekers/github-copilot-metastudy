@@ -31,6 +31,7 @@ help:
 	@echo "  convert   - Converteer PDFs naar Markdown"
 	@echo "  llm       - Voer LLM kwaliteitscontrole uit"
 	@echo "  pipeline  - Voer volledige pipeline uit (alle stappen)"
+	@echo "  import    - Importeer metadata JSON met schema-validatie"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
 	@echo "  test      - Voer unit tests uit"
@@ -87,6 +88,21 @@ llm: $(VENV_DIR)/bin/activate
 pipeline: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🚀 Starting complete pipeline...$(NC)"
 	$(VENV_PYTHON) $(CLI_SCRIPT) pipeline
+
+.PHONY: import
+import: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)📥 Importing metadata...$(NC)"
+	@if [ -z "$(MAX)" ] && [ -z "$(BATCH)" ]; then \
+		$(VENV_PYTHON) -c "from src.main import run_metadata_import; run_metadata_import()"; \
+	else \
+		ARGS=""; \
+		if [ -n "$(MAX)" ]; then ARGS="max_records=int('$(MAX)')"; fi; \
+		if [ -n "$(BATCH)" ]; then \
+		  if [ -n "$$ARGS" ]; then ARGS="$$ARGS, "; fi; \
+		  ARGS="$$ARGS batch_size=int('$(BATCH)')"; \
+		fi; \
+		$(VENV_PYTHON) -c "from src.main import run_metadata_import; run_metadata_import($$ARGS)"; \
+	fi
 
 # Development commands
 .PHONY: test

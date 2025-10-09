@@ -7,13 +7,13 @@ from .converter import (
     html_naar_md,
     pdf_naar_md,
     pak_tarball_uit,
-    verwijder_uitgepakte_tarball
+    verwijder_uitgepakte_tarball,
 )
 
 __all__ = [
-    'tex_naar_md',
-    'html_naar_md',
-    'pdf_naar_md',
-    'pak_tarball_uit',
-    'verwijder_uitgepakte_tarball'
+    "tex_naar_md",
+    "html_naar_md",
+    "pdf_naar_md",
+    "pak_tarball_uit",
+    "verwijder_uitgepakte_tarball",
 ]

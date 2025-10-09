@@ -10,8 +10,4 @@ from src.llm import LLMChecker
 __version__ = "1.0.0"
 __author__ = "GitHub Copilot Metastudy Project"
 
-__all__ = [
-    'PaperDatabase',
-    'ArxivClient', 
-    'LLMChecker'
-]
+__all__ = ["PaperDatabase", "ArxivClient", "LLMChecker"]
