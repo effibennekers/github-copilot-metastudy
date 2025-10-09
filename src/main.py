@@ -33,10 +33,24 @@ def print_stats():
     if not UI_CONFIG.get("show_statistics", True):
         return
 
+    # Tabel-aantallen ophalen
+    table_counts: dict[str, int] = {}
+    with db._connect() as conn:
+        cur = conn.cursor()
+        for table in ["metadata", "papers", "labels", "questions", "metadata_labels"]:
+            try:
+                cur.execute(f"SELECT COUNT(1) AS count FROM {table}")
+                row = cur.fetchone()
+                table_counts[table] = row["count"] if row else 0
+            except Exception:
+                table_counts[table] = 0
+
     print("\n" + "=" * 60)
     print("DATABASE STATISTIEKEN")
     print("=" * 60)
-    print(f"Totaal papers: {stats['total_papers']}")
+    print("Tabellen (aantal rijen):")
+    for tbl in ["metadata", "papers", "labels", "questions", "metadata_labels"]:
+        print(f"  {tbl}: {table_counts.get(tbl, 0)}")
 
     print("\nDownload Status:")
     for status, count in stats.get("download_status", {}).items():
@@ -81,7 +95,7 @@ def run_metadata_import(
 
 
 def run_paper_preparation(
-    batch_size: int | None = None, limit: int | None = None, db_path: str | None = None
+    batch_size: int | None = None, limit: int | None = None
 ) -> int:
     """Maak paper records aan op basis van bestaande metadata records.
 
@@ -97,14 +111,28 @@ def run_paper_preparation(
         kwargs["batch_size"] = int(batch_size)
     if limit is not None:
         kwargs["limit"] = int(limit)
-    if db_path is not None:
-        kwargs["db_path"] = db_path
 
     logger.info("🧩 Paper preparation from metadata start")
     created = db_import.prepare_paper_from_metadata(**kwargs)
     logger.info("✅ Paper preparation voltooid: %s records aangemaakt", created)
     return created
 
+
+def seed_labels_questions() -> int:
+    """Seed labels en questions vanuit data/labels.json."""
+    logging.config.dictConfig(LOGGING_CONFIG)
+    logger = logging.getLogger(__name__)
+
+    db_import = import_module("src.database.import")
+    project_root = Path(__file__).resolve().parent.parent
+    labels_path = str(Path(project_root / "data" / "labels.json"))
+
+    logger.info("🌱 Seeding labels/questions start")
+    logger.info(f"  - Labels: {labels_path}")
+
+    added = db_import.seed_labels_questions(labels_path=labels_path)
+    logger.info(f"✅ Seeding voltooid: {added} items toegevoegd/gededupliceerd")
+    return added
 
 def main():
     """Hoofd workflow voor metastudy"""

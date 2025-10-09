@@ -57,8 +57,8 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 class PaperDatabase:
-    def __init__(self, db_path: str):
-        self.db_path = db_path
+    def __init__(self):
+        pass
         self.init_database()
     
     def init_database(self):

@@ -32,6 +32,7 @@ help:
 	@echo "  pipeline  - Voer volledige pipeline uit (alle stappen)"
 	@echo "  import    - Importeer metadata JSON met schema-validatie"
 	@echo "  prepare   - Maak papers aan op basis van metadata"
+	@echo "  seed-labels - Seed labels en questions vanuit data/labels.json"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
 	@echo "  test      - Voer unit tests uit"
@@ -117,6 +118,15 @@ prepare: $(VENV_DIR)/bin/activate
 		  ARGS="$$ARGS limit=int('$(LIMIT)')"; \
 		fi; \
 		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation($$ARGS)"; \
+	fi
+
+.PHONY: seed-labels
+seed-labels: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🌱 Seeding labels and questions...$(NC)"
+	@if [ -z "$(LABELS)" ]; then \
+		$(VENV_PYTHON) -c "from src.main import seed_labels_questions; seed_labels_questions()"; \
+	else \
+		$(VENV_PYTHON) -c "from src.main import seed_labels_questions; seed_labels_questions(labels_path='$(LABELS)')"; \
 	fi
 
 # Development commands

@@ -7,12 +7,13 @@ import logging
 from pathlib import Path
 from typing import Generator, Optional
 from itertools import islice
+from datetime import datetime
 
 from tqdm import tqdm
 
 from jsonschema import Draft4Validator
 
-from src.database.models import PaperDatabase
+from src.database import PaperDatabase
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,6 @@ def _iter_json_records(json_path: str) -> Generator[dict, None, None]:
 def import_metadata(
     json_path: str,
     schema_path: str,
-    db_path: Optional[str] = None,
     max_records: Optional[int] = None,
     batch_size: int = 1000,
 ) -> int:
@@ -63,12 +63,11 @@ def import_metadata(
     Parameters:
     - json_path: pad naar JSON (object, array of JSONL)
     - schema_path: pad naar metadataschema (Draft-04)
-    - db_path: optioneel alternatief databasepad
 
     Returns: aantal succesvol geïmporteerde records
     """
     validator = _load_schema(schema_path)
-    db = PaperDatabase(db_path)
+    db = PaperDatabase()
 
     inserted_count = 0
     # Gebruik tqdm voortgang; bij onbekend totaal toont tqdm dynamische voortgang
@@ -134,9 +133,7 @@ def _build_arxiv_id_from_metadata(meta_id: str, versions: object) -> str:
     return f"{meta_id}{suffix}"
 
 
-def prepare_paper_from_metadata(
-    db_path: Optional[str] = None, batch_size: int = 5000, limit: Optional[int] = None
-) -> int:
+def prepare_paper_from_metadata(batch_size: int = 5000, limit: Optional[int] = None) -> int:
     """Maak paper-records aan voor alle metadata records.
 
     - arxiv_id: concateneer metadata.id met laatste versie uit "versions" (bv. 2510.01576v2)
@@ -144,7 +141,7 @@ def prepare_paper_from_metadata(
 
     Returns: aantal nieuw aangemaakte paper records
     """
-    db = PaperDatabase(db_path)
+    db = PaperDatabase()
     created = 0
 
     # Stream metadata records in batches om geheugen te sparen
@@ -177,3 +174,64 @@ def prepare_paper_from_metadata(
 
     logger.info("%d paper records aangemaakt uit metadata", created)
     return created
+
+
+def seed_labels_questions(labels_path: Optional[str] = None) -> int:
+    """Laad labels en questions uit data/labels.json en seed de database.
+
+    Returns: aantal (label, questions) records dat is toegevoegd (som van nieuwe labels en nieuwe questions).
+    """
+    db = PaperDatabase()
+
+    # Bepaal pad naar labels.json
+    if labels_path is None:
+        project_root = Path(__file__).resolve().parent.parent
+        labels_file = project_root / "data" / "labels.json"
+    else:
+        labels_file = Path(labels_path)
+
+    if not labels_file.exists():
+        raise FileNotFoundError(f"labels.json niet gevonden: {labels_file}")
+
+    data = json.loads(labels_file.read_text(encoding="utf-8"))
+    added = 0
+
+    with db._connect() as conn:
+        cur = conn.cursor()
+        now_iso = None
+        for item in data:
+            name = (item or {}).get("name")
+            questions = (item or {}).get("questions") or []
+            if not name:
+                continue
+            # Insert label (ignore if exists)
+            cur.execute(
+                "INSERT INTO labels (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                (name,),
+            )
+            cur.execute("SELECT id FROM labels WHERE name = %s", (name,))
+            label_row = cur.fetchone()
+            if not label_row:
+                continue
+            label_id = int(label_row["id"])  # dict_row
+
+            for prompt in questions:
+                if not prompt:
+                    continue
+                if now_iso is None:
+                    now_iso = datetime.now().isoformat()
+                cur.execute(
+                    """
+                    INSERT INTO questions (prompt, label_id, created_at)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (prompt, label_id) DO NOTHING
+                    """,
+                    (prompt, label_id, now_iso),
+                )
+                # Check of er daadwerkelijk een nieuwe rij is toegevoegd (rowcount kan 0 zijn bij DO NOTHING)
+                if cur.rowcount > 0:
+                    added += 1
+        conn.commit()
+
+    logger.info("Seeding voltooid uit %s; %d nieuwe items toegevoegd", labels_file, added)
+    return added

@@ -7,6 +7,7 @@ import json
 import ollama
 import logging
 from typing import Optional, Tuple, Dict, Any  # noqa: F401
+from datetime import datetime
 
 # Import configuratie
 from src.config import LLM_CONFIG
@@ -219,8 +220,72 @@ class LLMChecker:
             question=question, title=title, abstract=abstract
         )
 
-    def is_about_github_copilot(self, title: str, abstract: str) -> bool:
+    def is_about_github_copilot(self, title: str, abstract: str) -> Dict[str, object]:
         """Convenience: vaste vraag of het over GitHub Copilot gaat."""
-        return self.classify_title_abstract_boolean(
+        return self.classify_title_abstract_structured(
             question="Is this about GitHub Copilot?", title=title, abstract=abstract
+        )
+
+    # =====================================
+    # metadata_labels record helpers (DB schema)
+    # =====================================
+
+    def classify_to_metadata_label_record(
+        self,
+        question: str,
+        title: str,
+        abstract: str,
+        metadata_id: str,
+        label_id: int,
+    ) -> Dict[str, object]:
+        """
+        Classificeer en retourneer een dict die overeenkomt met het `metadata_labels` schema:
+
+        Keys: metadata_id, label_id, confidence_score, created_at, updated_at
+        """
+        structured = self.classify_title_abstract_structured(
+            question=question, title=title, abstract=abstract
+        )
+        now_iso = datetime.now().isoformat()
+        # Alleen een labelrecord teruggeven als de classificatie positief is
+        if not bool(structured.get("answer_value")):
+            return {
+                "metadata_id": metadata_id,
+                "label_id": label_id,
+                "confidence_score": None,
+                "created_at": now_iso,
+                "updated_at": now_iso,
+                "_applicable": False,  # hint voor aanroepende code
+            }
+        return {
+            "metadata_id": metadata_id,
+            "label_id": label_id,
+            "confidence_score": structured.get("confidence_score"),
+            "created_at": now_iso,
+            "updated_at": now_iso,
+            "_applicable": True,
+        }
+
+    def classify_record_to_metadata_label(
+        self, question: str, metadata_record: dict, label_id: int
+    ) -> Dict[str, object]:
+        """Convenience: neem een metadata-record en bouw een `metadata_labels`-vormig object."""
+        if not isinstance(metadata_record, dict):
+            self.logger.error("metadata_record must be a dict")
+            return {
+                "metadata_id": None,
+                "label_id": label_id,
+                "confidence_score": None,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+                "_applicable": False,
+            }
+        title, abstract = self._extract_title_abstract(metadata_record)
+        metadata_id = metadata_record.get("id")
+        return self.classify_to_metadata_label_record(
+            question=question,
+            title=title,
+            abstract=abstract,
+            metadata_id=metadata_id,
+            label_id=label_id,
         )
