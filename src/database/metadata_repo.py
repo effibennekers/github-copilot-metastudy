@@ -163,6 +163,16 @@ class MetadataRepository(BaseDatabase):
                 return metadata
             return None
 
+    def get_title_and_abstract(self, metadata_id: str) -> Optional[Dict[str, str]]:
+        """Haal alleen title en abstract op voor een metadata_id."""
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT title, abstract FROM metadata WHERE id = %s", (metadata_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {"title": row["title"], "abstract": row["abstract"]}
+
     def get_metadata_by_category(self, category: str) -> List[Dict]:
         with self._connect() as conn:
             cur = conn.cursor()

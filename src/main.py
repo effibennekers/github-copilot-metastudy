@@ -120,7 +120,7 @@ def import_labels_questions() -> int:
     return added
 
 
-def run_labeling(db: PaperDatabase | None = None, llm: LLMChecker | None = None) -> dict:
+def run_labeling() -> dict:
     """Verwerk labeling jobs rij-voor-rij vanuit labeling_queue.
 
     - Geen parameters nodig; neemt volgende job uit de queue totdat leeg.
@@ -130,8 +130,8 @@ def run_labeling(db: PaperDatabase | None = None, llm: LLMChecker | None = None)
     logging.config.dictConfig(LOGGING_CONFIG)
     logger = logging.getLogger(__name__)
 
-    database = db or PaperDatabase()
-    checker = llm or LLMChecker()
+    database = PaperDatabase()
+    checker = LLMChecker()
 
     stats = {
         "processed": 0,
@@ -160,18 +160,18 @@ def run_labeling(db: PaperDatabase | None = None, llm: LLMChecker | None = None)
             prompt: str = qrow["prompt"]
             label_id: int = int(qrow["label_id"])  # type: ignore[assignment]
 
-            record = database.get_metadata_by_id(str(metadata_id))
-            if not record:
+            ta = database.get_title_and_abstract(str(metadata_id))
+            if not ta:
                 stats["skipped_missing"] += 1
                 continue
 
-            mdl = checker.classify_record_to_metadata_label(
-                question=prompt, metadata_record=record, label_id=label_id
+            structured = checker.classify_title_abstract_structured(
+                question=prompt, title=ta["title"], abstract=ta["abstract"]
             )
             stats["processed"] += 1
-            if not bool(mdl.get("_applicable")):
+            if not bool(structured.get("answer_value")):
                 continue
-            confidence = mdl.get("confidence_score")
+            confidence = structured.get("confidence_score")
             database.upsert_metadata_label(
                 metadata_id=metadata_id, label_id=label_id, confidence_score=confidence
             )
