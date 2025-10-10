@@ -98,16 +98,18 @@ LOGGING_CONFIG = {
 
 # LLM Configuration (voor kwaliteitscontrole en analyse)
 LLM_CONFIG = {
-    "enabled": True,
-    "model_name": "llama3.2",
+    "model_name": "llama3:8b-instruct-q4_0",
     "ollama_api_base_url": "http://localhost:11434",
     "temperature": 0.1,
-    "batch_size": 5,
+    "batch_size": 2,
+    "format": "json",
+    "num_predict": 32,
+    "top_p": 0.9,
+    "top_k": 40,
     "batch_delay_seconds": 10,
     # Quality check prompt template
     "prompt_template": (
-        "Je bent een expert in het controleren van academische papers die zijn "
-        "geconverteerd van PDF naar Markdown.\n\n"
+        "Je bent een expert in het controleren van academische papers in Markdown.\n\n"
         "Controleer de volgende Markdown tekst op:\n"
         "1. Verkeerde koppen (# ## ###) - zorg dat ze logisch genest zijn\n"
         "2. Gebroken tabellen - herstel tabel formatting\n"
