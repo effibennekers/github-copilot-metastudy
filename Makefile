@@ -23,26 +23,21 @@ help:
 	@echo "  refresh   - Verwijder logs/caches, reset venv en installeer dependencies"
 	@echo ""
 	@echo "$(GREEN)Pipeline Commands:$(NC)"
-	@echo "  status    - Toon database statistieken"
-	@echo "  search    - Zoek en indexeer papers van arXiv"
-	@echo "  download  - Download PDFs voor geïndexeerde papers"
-	@echo "  convert   - Converteer PDFs naar Markdown"
-	@echo "  llm       - Voer LLM kwaliteitscontrole uit"
-	@echo "  pipeline  - Voer volledige pipeline uit (alle stappen)"
-	@echo "  import    - Importeer metadata JSON met schema-validatie"
-	@echo "  prepare   - Maak papers aan op basis van metadata"
-	@echo "  seed-labels - Seed labels en questions vanuit data/labels.json"
+	@echo "  import-labels     - Seed labels en questions vanuit data/labels.json"
+	@echo "  import-metadata   - Importeer metadata JSON met schema-validatie"
+	@echo "  prepare-download  - Maak papers aan op basis van metadata"
+	@echo "  status            - Toon database statistieken"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
-	@echo "  test      - Voer unit tests uit"
-	@echo "  lint      - Voer code linting uit"
 	@echo "  format    - Formatteer code met black"
+	@echo "  lint      - Voer code linting uit"
+	@echo "  test      - Voer unit tests uit"
 	@echo ""
 	@echo "$(YELLOW)Examples:$(NC)"
-	@echo "  make refresh   # Reset omgeving en installeer dependencies"
-	@echo "  make status    # Check huidige status"
-	@echo "  make search    # Alleen nieuwe papers zoeken"
-	@echo "  make pipeline  # Volledige workflow"
+	@echo "  make refresh          # Reset omgeving en installeer dependencies"
+	@echo "  make status           # Check huidige status"
+	@echo "  make import-metadata  # Metadata importeren met validatie"
+	@echo "  make prepare-download # Maak papers aan op basis van metadata"
 
 # Setup en installatie
 .PHONY: refresh
@@ -73,34 +68,8 @@ status: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📊 Checking database status...$(NC)"
 	$(VENV_PYTHON) -c "from src.main import print_stats; print_stats()"
 
-.PHONY: search
-search: $(VENV_DIR)/bin/activate
-	@echo "$(BLUE)🔍 Starting paper search and indexing...$(NC)"
-	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.arxiv_client import ArxivClient; from src.main import search_and_index_papers; logger=logging.getLogger('src'); db=PaperDatabase(); client=ArxivClient(); search_and_index_papers(db, client, logger)"
-
-.PHONY: download
-download: $(VENV_DIR)/bin/activate
-	@echo "$(BLUE)⬇️  Starting PDF downloads...$(NC)"
-	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.arxiv_client import ArxivClient; from src.main import download_pdfs; logger=logging.getLogger('src'); db=PaperDatabase(); client=ArxivClient(); download_pdfs(db, client, logger)"
-
-.PHONY: convert
-convert: $(VENV_DIR)/bin/activate
-	@echo "$(BLUE)📝 Starting PDF to Markdown conversion...$(NC)"
-	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.main import convert_to_markdown; logger=logging.getLogger('src'); db=PaperDatabase(); convert_to_markdown(db, logger)"
-
-.PHONY: llm
-llm: $(VENV_DIR)/bin/activate
-	@echo "$(BLUE)🤖 Starting LLM quality check...$(NC)"
-	@echo "$(YELLOW)💡 Note: LLM requires Ollama server running$(NC)"
-	$(VENV_PYTHON) -c "import logging.config, logging; from src.config import LOGGING_CONFIG; logging.config.dictConfig(LOGGING_CONFIG); from src.database import PaperDatabase; from src.llm import LLMChecker; from src.main import llm_quality_check; logger=logging.getLogger('src'); db=PaperDatabase(); checker=LLMChecker(); llm_quality_check(db, checker, logger)"
-
-.PHONY: pipeline
-pipeline: $(VENV_DIR)/bin/activate
-	@echo "$(BLUE)🚀 Starting complete pipeline...$(NC)"
-	$(VENV_PYTHON) -m src.main
-
-.PHONY: import
-import: $(VENV_DIR)/bin/activate
+.PHONY: import-metadata
+import-metadata: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📥 Importing metadata...$(NC)"
 	@if [ -z "$(MAX)" ] && [ -z "$(BATCH)" ]; then \
 		$(VENV_PYTHON) -c "from src.main import run_metadata_import; run_metadata_import()"; \
@@ -114,8 +83,8 @@ import: $(VENV_DIR)/bin/activate
 		$(VENV_PYTHON) -c "from src.main import run_metadata_import; run_metadata_import($$ARGS)"; \
 	fi
 
-.PHONY: prepare
-prepare: $(VENV_DIR)/bin/activate
+.PHONY: prepare-download
+prepare-download: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🧩 Preparing paper records from metadata...$(NC)"
 	@if [ -z "$(BATCH)" ] && [ -z "$(LIMIT)" ]; then \
 		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation()"; \
@@ -129,8 +98,8 @@ prepare: $(VENV_DIR)/bin/activate
 		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation($$ARGS)"; \
 	fi
 
-.PHONY: seed-labels
-seed-labels: $(VENV_DIR)/bin/activate
+.PHONY: import-labels
+import-labels: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🌱 Seeding labels and questions...$(NC)"
 	@if [ -z "$(LABELS)" ]; then \
 		$(VENV_PYTHON) -c "from src.main import seed_labels_questions; seed_labels_questions()"; \
@@ -192,17 +161,6 @@ data-info:
 	@ls -la data/md/ 2>/dev/null | wc -l | xargs -I {} echo "  {} Markdown files"
 
 # Combinatie targets voor workflows
-.PHONY: search-download
-search-download: search download
-
-.PHONY: download-convert
-download-convert: download convert
-
-.PHONY: convert-llm  
-convert-llm: convert llm
-
-.PHONY: full-processing
-full-processing: download convert llm
 
 # Safety checks
 .PHONY: check-ollama
