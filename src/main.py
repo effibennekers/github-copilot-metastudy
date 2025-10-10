@@ -177,12 +177,14 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
             )
             stats["processed"] += 1
             if not bool(structured.get("answer_value")):
+                logger.info("❌ %s", ta["title"])
                 continue
             confidence = structured.get("confidence_score")
             database.upsert_metadata_label(
                 metadata_id=metadata_id, label_id=label_id, confidence_score=confidence
             )
             stats["labeled"] += 1
+            logger.info("✅ %s", ta["title"])
         except Exception as exc:
             logger.warning(
                 "Labeling fout voor metadata_id=%s (question_id=%s): %s",
