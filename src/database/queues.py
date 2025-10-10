@@ -7,64 +7,20 @@ from .base import BaseDatabase
 
 class QueuesRepository(BaseDatabase):
     def ensure_queue_tables(self) -> None:
-        """Zorg dat de labeling_queue tabel bestaat met kolommen (metadata_id, question_id).
-
-        Voert een eenvoudige migratie uit indien de tabel al bestaat met alleen
-        `metadata_id` als primaire sleutel.
-        """
+        """Zorg dat de labeling_queue tabel bestaat met kolommen (metadata_id, question_id)."""
         with self._connect() as conn:
             cur = conn.cursor()
-            # Maak tabel aan indien niet aanwezig (met beide kolommen)
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS labeling_queue (
                     metadata_id TEXT NOT NULL,
-                    question_id INTEGER NOT NULL
+                    question_id INTEGER NOT NULL,
+                    CONSTRAINT pk_labeling_queue PRIMARY KEY (metadata_id, question_id),
+                    CONSTRAINT fk_queue_metadata FOREIGN KEY(metadata_id) REFERENCES metadata(id)
+                        ON DELETE CASCADE ON UPDATE CASCADE,
+                    CONSTRAINT fk_queue_question FOREIGN KEY(question_id) REFERENCES questions(id)
+                        ON DELETE CASCADE ON UPDATE CASCADE
                 )
-                """
-            )
-            # Voeg question_id kolom toe als migratiepad
-            cur.execute(
-                """
-                ALTER TABLE labeling_queue
-                ADD COLUMN IF NOT EXISTS question_id INTEGER
-                """
-            )
-            # Verwijder eventuele rijen zonder question_id (van oude staat)
-            cur.execute("DELETE FROM labeling_queue WHERE question_id IS NULL")
-            # Drop bestaande constraints en voeg correcte constraints toe
-            cur.execute(
-                "ALTER TABLE labeling_queue DROP CONSTRAINT IF EXISTS pk_labeling_queue"
-            )
-            cur.execute(
-                "ALTER TABLE labeling_queue DROP CONSTRAINT IF EXISTS labeling_queue_pkey"
-            )
-            cur.execute(
-                "ALTER TABLE labeling_queue DROP CONSTRAINT IF EXISTS fk_queue_metadata"
-            )
-            cur.execute(
-                "ALTER TABLE labeling_queue DROP CONSTRAINT IF EXISTS fk_queue_question"
-            )
-            cur.execute(
-                """
-                ALTER TABLE labeling_queue
-                ADD CONSTRAINT pk_labeling_queue PRIMARY KEY (metadata_id, question_id)
-                """
-            )
-            cur.execute(
-                """
-                ALTER TABLE labeling_queue
-                ADD CONSTRAINT fk_queue_metadata
-                FOREIGN KEY(metadata_id) REFERENCES metadata(id)
-                ON DELETE CASCADE ON UPDATE CASCADE
-                """
-            )
-            cur.execute(
-                """
-                ALTER TABLE labeling_queue
-                ADD CONSTRAINT fk_queue_question
-                FOREIGN KEY(question_id) REFERENCES questions(id)
-                ON DELETE CASCADE ON UPDATE CASCADE
                 """
             )
             conn.commit()
