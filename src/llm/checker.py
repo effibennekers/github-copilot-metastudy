@@ -7,6 +7,7 @@ from datetime import datetime
 import json
 import logging
 from typing import Any, Dict, Optional, Tuple
+import re
 
 import ollama
 
@@ -48,18 +49,30 @@ class LLMChecker:
 
 
     async def _chat_async(self, messages: list[dict]) -> str:
+        if self.async_client is None:
+            self.async_client = ollama.AsyncClient(host=self.ollama_url)
         response = await self.async_client.chat(
             model=self.model_name,
             messages=messages,
             options={
                 "temperature": LLM_CONFIG.get("temperature", 0.1),
-                "num_predict": LLM_CONFIG.get("num_predict", 64),
+                "num_predict": LLM_CONFIG.get("num_predict", 32),
                 "format": LLM_CONFIG.get("format", "json"),
                 "top_p": LLM_CONFIG.get("top_p", 0.9),
                 "top_k": LLM_CONFIG.get("top_k", 40),
             },
         )
         return ((response or {}).get("message") or {}).get("content", "").strip()
+
+    def _strip_code_fences(self, text: str) -> str:
+        if not text:
+            return text
+        s = text.strip()
+        # Match ```json\n...\n``` of ```\n...\n```
+        m = re.match(r"^```[a-zA-Z0-9]*\s*\n([\s\S]*?)\n```\s*$", s)
+        if m:
+            return m.group(1).strip()
+        return s
 
 
     def _parse_structured(self, text: str) -> Tuple[Optional[bool], Optional[float]]:
@@ -121,7 +134,9 @@ class LLMChecker:
         try:
             messages = self._build_messages(question=question, title=title, abstract=abstract)
             content = await self._chat_async(messages)
-            ans, conf = self._parse_structured(content)
+            self.logger.info("Content: %s", content)
+            sanitized = self._strip_code_fences(content)
+            ans, conf = self._parse_structured(sanitized)
             if ans is None:
                 self.logger.warning("Unclear LLM response (async); defaulting answer to False")
                 ans = False
