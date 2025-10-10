@@ -25,7 +25,8 @@ help:
 	@echo "$(GREEN)Pipeline Commands:$(NC)"
 	@echo "  import-labels     - Seed labels en questions vanuit data/labels.json"
 	@echo "  import-metadata   - Importeer metadata JSON met schema-validatie"
-	@echo "  prepare-labeling  - Vul labeling_queue (default: date_after=2025-10-01)"
+	@echo "  run-labeling      - Verwerk labeling_queue (default: JOBS=10)"
+	@echo "  prepare-labeling  - Vul labeling_queue (default: date_after=2025-09-01)"
 	@echo "  list-questions    - Toon alle questions met labelnaam"
 	@echo "  prepare-download  - Maak papers aan op basis van metadata"
 	@echo "  status            - Toon database statistieken"
@@ -40,7 +41,9 @@ help:
 	@echo "  make status           # Check huidige status"
 	@echo "  make import-metadata  # Metadata importeren met validatie"
 	@echo "  make prepare-download # Maak papers aan op basis van metadata"
-	@echo "  make prepare-labeling Q=42 # Queue labeling jobs na 2025-10-01 voor vraag 42"
+	@echo "  make run-labeling        # Verwerk 10 labeling jobs (default)"
+	@echo "  make run-labeling JOBS=5 # Verwerk 5 labeling jobs"
+	@echo "  make prepare-labeling Q=42 # Queue labeling jobs na 2025-09-01 voor vraag 42"
 	@echo "  make list-questions   # Toon alle questions"
 
 # Setup en installatie
@@ -137,6 +140,12 @@ format: $(VENV_DIR)/bin/activate
 	$(VENV_PYTHON) -m black src/ --line-length=100
 
 # Utility commands
+.PHONY: run-labeling
+run-labeling: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🏷️  Running labeling jobs...$(NC)"
+	@if [ -z "$(JOBS)" ]; then JOBS=10; else JOBS=$(JOBS); fi; \
+	$(VENV_PYTHON) -c "from src.main import run_labeling; import json; print(json.dumps(run_labeling(labeling_jobs=int('$$JOBS')), ensure_ascii=False))"
+
 
 .PHONY: list-questions
 list-questions: $(VENV_DIR)/bin/activate
