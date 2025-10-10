@@ -20,8 +20,7 @@ help:
 	@echo "=================================="
 	@echo ""
 	@echo "$(GREEN)Setup Commands:$(NC)"
-	@echo "  setup     - Installeer dependencies en setup virtual environment"
-	@echo "  clean     - Verwijder virtual environment en cache bestanden"
+	@echo "  refresh   - Verwijder logs/caches, reset venv en installeer dependencies"
 	@echo ""
 	@echo "$(GREEN)Pipeline Commands:$(NC)"
 	@echo "  status    - Toon database statistieken"
@@ -40,15 +39,25 @@ help:
 	@echo "  format    - Formatteer code met black"
 	@echo ""
 	@echo "$(YELLOW)Examples:$(NC)"
-	@echo "  make setup     # Eenmalige setup"
+	@echo "  make refresh   # Reset omgeving en installeer dependencies"
 	@echo "  make status    # Check huidige status"
 	@echo "  make search    # Alleen nieuwe papers zoeken"
 	@echo "  make pipeline  # Volledige workflow"
 
 # Setup en installatie
-.PHONY: setup
-setup: $(VENV_DIR)/bin/activate
-	@echo "$(GREEN)✅ Setup completed successfully!$(NC)"
+.PHONY: refresh
+refresh:
+	@echo "$(BLUE)🔄 Refreshing environment (logs, caches, venv, deps)...$(NC)"
+	@echo "$(YELLOW)🧹 Removing old logs and caches...$(NC)"
+	@rm -f metastudy.log 2>/dev/null || true
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -name "*.pyc" -delete 2>/dev/null || true
+	@find . -name "*.pyo" -delete 2>/dev/null || true
+	@find . -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(YELLOW)🔁 Resetting virtual environment...$(NC)"
+	@rm -rf $(VENV_DIR)
+	@$(MAKE) $(VENV_DIR)/bin/activate
+	@echo "$(GREEN)✅ Refresh completed successfully!$(NC)"
 	@echo "$(YELLOW)💡 Run 'make status' to check current database status$(NC)"
 
 $(VENV_DIR)/bin/activate: requirements.txt
@@ -146,15 +155,6 @@ format: $(VENV_DIR)/bin/activate
 	$(VENV_PYTHON) -m black src/ --line-length=100
 
 # Utility commands
-.PHONY: clean
-clean:
-	@echo "$(YELLOW)🧹 Cleaning up...$(NC)"
-	rm -rf $(VENV_DIR)
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -name "*.pyc" -delete 2>/dev/null || true
-	find . -name "*.pyo" -delete 2>/dev/null || true
-	find . -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	@echo "$(GREEN)✅ Cleanup completed$(NC)"
 
 .PHONY: install-ollama
 install-ollama:
