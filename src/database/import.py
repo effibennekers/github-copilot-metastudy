@@ -215,18 +215,22 @@ def seed_labels_questions(labels_path: Optional[str] = None) -> int:
                 continue
             label_id = int(label_row["id"])  # dict_row
 
-            for prompt in questions:
-                if not prompt:
-                    continue
+            for q in questions:
+                if not isinstance(q, dict):
+                    raise ValueError("Elke vraag moet een object met keys {name,prompt} zijn")
+                q_name = q.get("name")
+                prompt = q.get("prompt")
+                if not q_name or not prompt:
+                    raise ValueError("Question items vereisen zowel 'name' als 'prompt'")
                 if now_iso is None:
                     now_iso = datetime.now().isoformat()
                 cur.execute(
                     """
-                    INSERT INTO questions (prompt, label_id, created_at)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (prompt, label_id) DO NOTHING
+                    INSERT INTO questions (name, prompt, label_id, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (name, label_id) DO NOTHING
                     """,
-                    (prompt, label_id, now_iso),
+                    (q_name, prompt, label_id, now_iso),
                 )
                 # Check of er daadwerkelijk een nieuwe rij is toegevoegd (rowcount kan 0 zijn bij DO NOTHING)
                 if cur.rowcount > 0:

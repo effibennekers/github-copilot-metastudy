@@ -1,0 +1,21 @@
+[
+  {
+    "name": "money",
+    "questions": [
+      { "name": "money_q1", "prompt": "Analyze the provided text. Determine if its primary subject is about financial transactions, budgeting, loans, investments, or any other activity directly related to monetary or capital management." },
+      { "name": "money_q2", "prompt": "Does the text contain specific amounts, currency designators (€, $), or references to payment methods?" }
+    ]
+  },
+  {
+    "name": "coding_assistant",
+    "questions": [
+      { "name": "coding_assistant_q1", "prompt": "Instructions:\nYou are an expert text classifier. Analyze the following ARTICLE_TEXT to determine if the primary subject is about the **impact of AI coding assistants on developer productivity.**\n\n**Definition of Focus Topic:**\nThe article must discuss research, user experience, case studies, or opinions regarding how AI tools (such as GitHub Copilot, Amazon CodeWhisperer, or similar code suggestion/generation technologies) affect one or more of the following: **developer speed, efficiency, code quality, time-to-market, or the overall rate of code completion.**\n\n**Classification Rules:**\n1.  **TRUE** if the article's main focus is the positive or negative impact on developer productivity or efficiency due to using AI coding assistants.\n2.  **FALSE** if the article only mentions coding assistants in passing, focuses purely on the technical features of the tool, or discusses general AI without relating it to development work efficiency.\n\n**Output Format:**\nRespond only with a single JSON object. Do not include any other text or explanation.\n\n{\n  \"is_productivity_impact_article\": [TRUE/FALSE]\n}\n\nARTICLE_TEXT:\n[Hier voeg je de tekst van het artikel in]" }
+    ]
+  },
+  {
+    "name": "health",
+    "questions": [
+      { "name": "health_q1", "prompt": "Assess whether the content includes medical advice, symptom descriptions, treatment plans, or references to healthcare providers. Is it related to physical or mental health?" }
+    ]
+  }
+]

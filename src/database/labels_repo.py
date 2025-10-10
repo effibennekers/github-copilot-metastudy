@@ -25,6 +25,7 @@ class LabelsRepository(BaseDatabase):
                 """
                 CREATE TABLE IF NOT EXISTS questions (
                     id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
                     prompt TEXT NOT NULL,
                     label_id INTEGER NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -34,7 +35,7 @@ class LabelsRepository(BaseDatabase):
                 """
             )
             cur.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_questions_prompt_label ON questions(prompt, label_id)"
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_questions_name_label ON questions(name, label_id)"
             )
             cur.execute("CREATE INDEX IF NOT EXISTS idx_questions_label_id ON questions(label_id)")
             # metadata_labels
