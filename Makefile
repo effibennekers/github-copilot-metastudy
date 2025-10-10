@@ -130,7 +130,7 @@ format: $(VENV_DIR)/bin/activate
 .PHONY: list-questions
 list-questions: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)❓ Listing questions...$(NC)"
-	@$(VENV_PYTHON) -c "from src.main import list_questions_lines; print('\n'.join(list_questions_lines()))"
+	@$(VENV_PYTHON) -c "from src.main import list_questions; print('\n'.join(list_questions()))"
 
 .PHONY: install-ollama
 install-ollama:

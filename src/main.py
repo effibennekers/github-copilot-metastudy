@@ -209,16 +209,11 @@ def run_labeling(
     return stats
 
 
-def list_questions() -> list[dict]:
-    """Geef een lijst terug met questions inclusief labelnaam (via repository)."""
+def list_questions() -> list[str]:
+    """Retourneer leesbare regels: "id: <id>, name: <name>, label: <label_name>"""
     logging.config.dictConfig(LOGGING_CONFIG)
     db = PaperDatabase()
-    return db.list_questions()
-
-
-def list_questions_lines() -> list[str]:
-    """Retourneer leesbare regels: "id: <id>, name: <name>, label: <label_name>"""
-    rows = list_questions()
+    rows = db.list_questions()
     return [f"id: {r['id']}, name: {r['name']}, label: {r['label_name']}" for r in rows]
 
 def main():
