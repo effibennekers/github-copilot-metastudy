@@ -8,6 +8,7 @@ import logging
 import logging.config
 import sys
 import asyncio
+import time
 from pathlib import Path
 
 # Import from package modules
@@ -141,6 +142,8 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
         "errors": 0,
     }
 
+    start_ts = time.perf_counter()
+
     logger.info(
         "🔖 Start labeling vanuit labeling_queue (rij-voor-rij), max jobs=%s",
         labeling_jobs,
@@ -223,6 +226,10 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
         stats["skipped_missing"],
         stats["errors"],
     )
+    elapsed = time.perf_counter() - start_ts
+    stats["elapsed_seconds"] = round(elapsed, 3)
+    logger.info("⏱️  Totale duur: %.3fs", elapsed)
+    return stats
 
 
 def list_questions() -> list[str]:
