@@ -216,6 +216,23 @@ def list_questions() -> list[str]:
     rows = db.list_questions()
     return [f"id: {r['id']}, name: {r['name']}, label: {r['label_name']}" for r in rows]
 
+
+def run_prepare_metadata_labeling(question_id: int, date_after: str = "2025-10-01") -> int:
+    """Vul labeling_queue met (metadata_id, question_id) voor metadata na date_after."""
+    logging.config.dictConfig(LOGGING_CONFIG)
+    logger = logging.getLogger(__name__)
+    if not isinstance(question_id, int) or question_id <= 0:
+        raise ValueError("question_id moet een positief integer zijn")
+    db = PaperDatabase()
+    logger.info(
+        "🔧 prepare_metadata_labeling start: question_id=%s, date_after=%s",
+        question_id,
+        date_after,
+    )
+    enqueued = db.prepare_metadata_labeling(question_id=question_id, date_after=date_after)
+    logger.info("✅ labeling_queue gevuld: %s items", enqueued)
+    return enqueued
+
 def main():
     """Hoofd workflow voor metastudy"""
     # Setup logging first

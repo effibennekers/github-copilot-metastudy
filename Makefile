@@ -25,6 +25,7 @@ help:
 	@echo "$(GREEN)Pipeline Commands:$(NC)"
 	@echo "  import-labels     - Seed labels en questions vanuit data/labels.json"
 	@echo "  import-metadata   - Importeer metadata JSON met schema-validatie"
+	@echo "  prepare-labeling  - Vul labeling_queue (default: date_after=2025-10-01)"
 	@echo "  list-questions    - Toon alle questions met labelnaam"
 	@echo "  prepare-download  - Maak papers aan op basis van metadata"
 	@echo "  status            - Toon database statistieken"
@@ -39,6 +40,7 @@ help:
 	@echo "  make status           # Check huidige status"
 	@echo "  make import-metadata  # Metadata importeren met validatie"
 	@echo "  make prepare-download # Maak papers aan op basis van metadata"
+	@echo "  make prepare-labeling Q=42 # Queue labeling jobs na 2025-10-01 voor vraag 42"
 	@echo "  make list-questions   # Toon alle questions"
 
 # Setup en installatie
@@ -99,6 +101,15 @@ prepare-download: $(VENV_DIR)/bin/activate
 		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation($$ARGS)"; \
 	fi
 
+
+.PHONY: prepare-labeling
+prepare-labeling: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🗂️  Preparing labeling queue...$(NC)"
+	@if [ -z "$(Q)" ]; then \
+		echo "$(RED)❌ Provide question id via Q=<id>$(NC)"; exit 1; \
+	fi
+	@if [ -z "$(DATE)" ]; then DATE=2025-10-01; else DATE=$(DATE); fi; \
+	$(VENV_PYTHON) -c "from src.main import run_prepare_metadata_labeling; print(run_prepare_metadata_labeling(question_id=int('$(Q)'), date_after='$$DATE'))"
 
 .PHONY: import-labels
 import-labels: $(VENV_DIR)/bin/activate
