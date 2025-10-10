@@ -7,6 +7,39 @@ from .base import BaseDatabase
 
 
 class PapersRepository(BaseDatabase):
+    def ensure_papers_tables(self) -> None:
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS papers (
+                    arxiv_id TEXT PRIMARY KEY,
+                    download_status TEXT DEFAULT 'PENDING',
+                    download_type TEXT DEFAULT 'PENDING',
+                    llm_check_status TEXT DEFAULT 'PENDING',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata_id TEXT,
+                    CONSTRAINT fk_metadata FOREIGN KEY(metadata_id)
+                        REFERENCES metadata(id) ON DELETE SET NULL ON UPDATE CASCADE
+                )
+                """
+            )
+            # indexen
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_download_status ON papers(download_status)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_download_type ON papers(download_type)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_llm_status ON papers(llm_check_status)"
+            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON papers(created_at)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_papers_metadata_id ON papers(metadata_id)"
+            )
+            conn.commit()
     def paper_exists(self, arxiv_id: str) -> bool:
         with self._connect() as conn:
             cur = conn.cursor()

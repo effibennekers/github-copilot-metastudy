@@ -8,6 +8,43 @@ from .base import BaseDatabase
 
 
 class MetadataRepository(BaseDatabase):
+    def ensure_metadata_tables(self) -> None:
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS metadata (
+                    id TEXT PRIMARY KEY,
+                    submitter TEXT,
+                    authors TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    comments TEXT,
+                    journal_ref TEXT,
+                    doi TEXT,
+                    report_no TEXT,
+                    categories TEXT NOT NULL,
+                    license TEXT,
+                    abstract TEXT NOT NULL,
+                    versions TEXT NOT NULL,
+                    update_date DATE NOT NULL,
+                    authors_parsed TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            # indexen
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_metadata_categories ON metadata(categories)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_metadata_update_date ON metadata(update_date)"
+            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_metadata_doi ON metadata(doi)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_metadata_created_at ON metadata(created_at)"
+            )
+            conn.commit()
     def metadata_exists(self, metadata_id: str) -> bool:
         with self._connect() as conn:
             cur = conn.cursor()

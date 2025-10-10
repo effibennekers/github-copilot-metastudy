@@ -13,5 +13,8 @@ class PaperDatabase(SchemaManager, MetadataRepository, PapersRepository, LabelsR
     def __init__(self):
         super().__init__()
         self.init_database()
-        # Zorg dat queue tabellen bestaan
+        # Zorg dat alle tabellen per repository bestaan
+        self.ensure_metadata_tables()
+        self.ensure_papers_tables()
+        self.ensure_labels_tables()
         self.ensure_queue_tables()

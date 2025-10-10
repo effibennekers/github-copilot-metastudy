@@ -7,6 +7,57 @@ from .base import BaseDatabase
 
 
 class LabelsRepository(BaseDatabase):
+    def ensure_labels_tables(self) -> None:
+        with self._connect() as conn:
+            cur = conn.cursor()
+            # labels
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS labels (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL
+                )
+                """
+            )
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_labels_name ON labels(name)")
+            # questions
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS questions (
+                    id SERIAL PRIMARY KEY,
+                    prompt TEXT NOT NULL,
+                    label_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT fk_questions_label FOREIGN KEY(label_id)
+                        REFERENCES labels(id) ON DELETE CASCADE
+                )
+                """
+            )
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_questions_prompt_label ON questions(prompt, label_id)"
+            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_questions_label_id ON questions(label_id)")
+            # metadata_labels
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS metadata_labels (
+                    metadata_id TEXT NOT NULL,
+                    label_id INTEGER NOT NULL,
+                    confidence_score NUMERIC(3,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT pk_metadata_labels PRIMARY KEY (metadata_id, label_id),
+                    CONSTRAINT fk_metadata_labels_metadata FOREIGN KEY(metadata_id)
+                        REFERENCES metadata(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                    CONSTRAINT fk_metadata_labels_label FOREIGN KEY(label_id)
+                        REFERENCES labels(id) ON DELETE CASCADE ON UPDATE CASCADE
+                )
+                """
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_metadata_labels_label_id ON metadata_labels(label_id)"
+            )
+            conn.commit()
     def get_question_by_id(self, question_id: int) -> dict | None:
         """Haal een question op met bijbehorende label_id.
 
