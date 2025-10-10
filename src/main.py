@@ -120,7 +120,7 @@ def import_labels_questions() -> int:
     return added
 
 
-def run_labeling() -> dict:
+def run_labeling(labeling_jobs: int = 10) -> dict:
     """Verwerk labeling jobs rij-voor-rij vanuit labeling_queue.
 
     - Geen parameters nodig; neemt volgende job uit de queue totdat leeg.
@@ -140,12 +140,19 @@ def run_labeling() -> dict:
         "errors": 0,
     }
 
-    logger.info("🔖 Start labeling vanuit labeling_queue (rij-voor-rij)")
+    logger.info(
+        "🔖 Start labeling vanuit labeling_queue (rij-voor-rij), max jobs=%s",
+        labeling_jobs,
+    )
 
+    jobs_taken = 0
     while True:
+        if jobs_taken >= int(labeling_jobs):
+            break
         job = database.pop_next_labeling_job()
         if not job:
             break
+        jobs_taken += 1
         metadata_id = job.get("metadata_id")
         question_id = job.get("question_id")
         if not metadata_id or not isinstance(question_id, int):
