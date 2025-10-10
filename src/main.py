@@ -7,6 +7,7 @@ Uitgebreide pipeline voor paper downloading, conversie en analyse
 import logging
 import logging.config
 import sys
+import asyncio
 from pathlib import Path
 
 # Import from package modules
@@ -145,55 +146,75 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
         labeling_jobs,
     )
 
-    jobs_taken = 0
-    while True:
-        if jobs_taken >= int(labeling_jobs):
-            break
+    # Verzamel tot 'labeling_jobs' items uit de queue en bereid inputs voor
+    jobs: list[dict] = []
+    for _ in range(int(labeling_jobs)):
         job = database.pop_next_labeling_job()
         if not job:
             break
-        jobs_taken += 1
         metadata_id = job.get("metadata_id")
         question_id = job.get("question_id")
         if not metadata_id or not isinstance(question_id, int):
             stats["skipped_missing"] += 1
             continue
+        qrow = database.get_question_by_id(int(question_id))
+        if not qrow:
+            stats["skipped_missing"] += 1
+            continue
+        prompt: str = qrow["prompt"]
+        label_id: int = int(qrow["label_id"])  # type: ignore[assignment]
+        ta = database.get_title_and_abstract(str(metadata_id))
+        if not ta:
+            stats["skipped_missing"] += 1
+            continue
+        jobs.append(
+            {
+                "metadata_id": metadata_id,
+                "question_id": question_id,
+                "label_id": label_id,
+                "prompt": prompt,
+                "title": ta["title"],
+                "abstract": ta["abstract"],
+            }
+        )
 
-        try:
-            qrow = database.get_question_by_id(question_id)
-            if not qrow:
-                stats["skipped_missing"] += 1
-                continue
-            prompt: str = qrow["prompt"]
-            label_id: int = int(qrow["label_id"])  # type: ignore[assignment]
+    # Run LLM-calls async met bounded concurrency
+    async def _classify_all(jobs_input: list[dict]) -> list[dict]:
+        sem = asyncio.Semaphore(int(LLM_CONFIG.get("batch_size", 2)))
 
-            ta = database.get_title_and_abstract(str(metadata_id))
-            if not ta:
-                stats["skipped_missing"] += 1
-                continue
+        async def _one(j: dict) -> dict:
+            async with sem:
+                try:
+                    structured = await checker.classify_title_abstract_structured_async(
+                        question=j["prompt"], title=j["title"], abstract=j["abstract"]
+                    )
+                    return {"job": j, "structured": structured, "error": None}
+                except Exception as e:  # pragma: no cover
+                    return {"job": j, "structured": None, "error": str(e)}
 
-            structured = checker.classify_title_abstract_structured(
-                question=prompt, title=ta["title"], abstract=ta["abstract"]
-            )
-            stats["processed"] += 1
-            counter = f"{stats['processed']:03d}"
-            if not bool(structured.get("answer_value")):
-                logger.info("%s ❌ %s", counter, ta["title"])
-                continue
-            confidence = structured.get("confidence_score")
-            database.upsert_metadata_label(
-                metadata_id=metadata_id, label_id=label_id, confidence_score=confidence
-            )
-            stats["labeled"] += 1
-            logger.info("%s ✅ %s", counter, ta["title"])
-        except Exception as exc:
-            logger.warning(
-                "Labeling fout voor metadata_id=%s (question_id=%s): %s",
-                metadata_id,
-                question_id,
-                exc,
-            )
+        tasks = [_one(j) for j in jobs_input]
+        return await asyncio.gather(*tasks)
+
+    results: list[dict] = asyncio.run(_classify_all(jobs)) if jobs else []
+
+    # Verwerk resultaten sequentieel (DB upserts)
+    for res in results:
+        j = res["job"]
+        if res.get("error") or not isinstance(res.get("structured"), dict):
             stats["errors"] += 1
+            continue
+        structured = res["structured"]
+        stats["processed"] += 1
+        counter = f"{stats['processed']:03d}"
+        if not bool(structured.get("answer_value")):
+            logger.info("%s ❌ %s", counter, j["title"])
+            continue
+        confidence = structured.get("confidence_score")
+        database.upsert_metadata_label(
+            metadata_id=j["metadata_id"], label_id=j["label_id"], confidence_score=confidence
+        )
+        stats["labeled"] += 1
+        logger.info("%s ✅ %s", counter, j["title"]) 
 
     logger.info(
         "✅ Labeling klaar: processed=%s, labeled=%s, skipped_missing=%s, errors=%s",
@@ -202,7 +223,6 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
         stats["skipped_missing"],
         stats["errors"],
     )
-    return stats
 
 
 def list_questions() -> list[str]:

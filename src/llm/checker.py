@@ -17,7 +17,7 @@ class LLMChecker:
     def __init__(self):
         self.config = LLM_CONFIG
         self.ollama_url = self.config.get("ollama_api_base_url", "http://localhost:11434")
-        self.model_name = self.config.get("model_name", "llama3.2")
+        self.model_name = self.config.get("model_name", "llama3:8b-instruct")
         self.logger = logging.getLogger(__name__)
 
         # Check if LLM is enabled
@@ -34,9 +34,14 @@ class LLMChecker:
 
     def _build_messages(self, question: str, title: str, abstract: str) -> list[dict]:
         system_msg = (
-            "Respond strictly in JSON with the following schema: "
-            '{"answer": true|false, "confidence": number between 0 and 1}. '
-            "No extra text or explanation."
+            "You are an extremely strict and efficient binary classification agent. "
+            "Your task is to analyze the provided TEXT to answer the given QUESTION. "
+            "You **MUST** respond in strict JSON format. "
+            "No extra text, explanation, introduction, or markdown is allowed. "
+            "The JSON schema is: {\"answer\": true|false, \"confidence\": number}. "
+            "The 'confidence' must be a floating-point number between 0.00 and 1.00, "
+            "reflecting the certainty of your 'answer'. "
+            "**Respond directly and ONLY with the JSON output.**"
         )
         user_msg = f"QUESTION: {question}\n\nTITLE: {title}\n\nABSTRACT: {abstract}"
         return [
@@ -51,7 +56,25 @@ class LLMChecker:
             messages=messages,
             options={
                 "temperature": self.config.get("temperature", 0.1),
-                "num_predict": self.config.get("max_tokens", 512),
+                "num_predict": self.config.get("num_predict", 64),
+                "format": self.config.get("format", "json"),
+                "top_p": self.config.get("top_p", 0.9),
+                "top_k": self.config.get("top_k", 40),
+            },
+        )
+        return ((response or {}).get("message") or {}).get("content", "").strip()
+
+    async def _chat_async(self, messages: list[dict]) -> str:
+        client = ollama.AsyncClient(host=self.ollama_url)
+        response = await client.chat(
+            model=self.model_name,
+            messages=messages,
+            options={
+                "temperature": self.config.get("temperature", 0.1),
+                "num_predict": self.config.get("num_predict", 64),
+                "format": self.config.get("format", "json"),
+                "top_p": self.config.get("top_p", 0.9),
+                "top_k": self.config.get("top_k", 40),
             },
         )
         return ((response or {}).get("message") or {}).get("content", "").strip()
@@ -161,9 +184,10 @@ class LLMChecker:
 
         try:
             messages = self._build_messages(question=question, title=title, abstract=abstract)
-            self.logger.info("Calling Ollama for structured classification")
+            self.logger.info(messages)
             content = self._chat(messages)
             ans, conf = self._parse_structured(content)
+            self.logger.info("Answer: %s, Confidence: %s", ans, conf)
             if ans is None:
                 self.logger.warning("Unclear LLM response; defaulting answer to False")
                 ans = False
@@ -172,6 +196,40 @@ class LLMChecker:
             return result
         except Exception as exc:
             self.logger.error("LLM classification failed: %s", exc)
+            result["answer_value"] = False
+            return result
+
+    async def classify_title_abstract_structured_async(
+        self, question: str, title: str, abstract: str
+    ) -> Dict[str, object]:
+        """Async variant van classify_title_abstract_structured."""
+        result = self._default_structured()
+        if not self.is_enabled():
+            self.logger.info("LLM checker disabled; returning default structured result")
+            result["answer_value"] = False
+            return result
+
+        if not title or not abstract or not question:
+            self.logger.warning(
+                "Missing question/title/abstract; returning default structured result"
+            )
+            result["answer_value"] = False
+            return result
+
+        try:
+            messages = self._build_messages(question=question, title=title, abstract=abstract)
+            self.logger.info(messages)
+            content = await self._chat_async(messages)
+            ans, conf = self._parse_structured(content)
+            self.logger.info("Answer: %s, Confidence: %s", ans, conf)
+            if ans is None:
+                self.logger.warning("Unclear LLM response (async); defaulting answer to False")
+                ans = False
+            result["answer_value"] = bool(ans)
+            result["confidence_score"] = conf
+            return result
+        except Exception as exc:
+            self.logger.error("LLM async classification failed: %s", exc)
             result["answer_value"] = False
             return result
 
@@ -191,9 +249,6 @@ class LLMChecker:
         """
         Convenience: classificeer rechtstreeks een metadata-record met 'title' en 'abstract'.
         """
-        if not isinstance(metadata_record, dict):
-            self.logger.error("metadata_record must be a dict")
-            return False
         title = metadata_record.get("title") or ""
         abstract = metadata_record.get("abstract") or ""
         if not title or not abstract:
@@ -209,21 +264,12 @@ class LLMChecker:
         """
         Gestructureerde classificatie direct op een metadata-record met 'title' en 'abstract'.
         """
-        if not isinstance(metadata_record, dict):
-            self.logger.error("metadata_record must be a dict")
-            return {"answer_value": False, "confidence_score": None, "llm_model": self.model_name}
         title, abstract = self._extract_title_abstract(metadata_record)
         if not title or not abstract:
             self.logger.warning("metadata_record mist 'title' of 'abstract'")
             return {"answer_value": False, "confidence_score": None, "llm_model": self.model_name}
         return self.classify_title_abstract_structured(
             question=question, title=title, abstract=abstract
-        )
-
-    def is_about_github_copilot(self, title: str, abstract: str) -> Dict[str, object]:
-        """Convenience: vaste vraag of het over GitHub Copilot gaat."""
-        return self.classify_title_abstract_structured(
-            question="Is this about GitHub Copilot?", title=title, abstract=abstract
         )
 
     # =====================================
@@ -270,16 +316,6 @@ class LLMChecker:
         self, question: str, metadata_record: dict, label_id: int
     ) -> Dict[str, object]:
         """Convenience: neem een metadata-record en bouw een `metadata_labels`-vormig object."""
-        if not isinstance(metadata_record, dict):
-            self.logger.error("metadata_record must be a dict")
-            return {
-                "metadata_id": None,
-                "label_id": label_id,
-                "confidence_score": None,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
-                "_applicable": False,
-            }
         title, abstract = self._extract_title_abstract(metadata_record)
         metadata_id = metadata_record.get("id")
         return self.classify_to_metadata_label_record(
