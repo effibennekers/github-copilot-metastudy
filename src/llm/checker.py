@@ -19,6 +19,11 @@ class LLMChecker:
         self.ollama_url = self.config.get("ollama_api_base_url", "http://localhost:11434")
         self.model_name = self.config.get("model_name", "llama3:8b-instruct")
         self.logger = logging.getLogger(__name__)
+        # Reuse a single AsyncClient instance for all async calls
+        try:
+            self.async_client = ollama.AsyncClient(host=self.ollama_url)
+        except Exception:
+            self.async_client = None
 
         # Check if LLM is enabled
         if not self.config.get("enabled", False):
@@ -52,7 +57,7 @@ class LLMChecker:
     # Sync chat verwijderd; gebruik uitsluitend _chat_async
 
     async def _chat_async(self, messages: list[dict]) -> str:
-        client = ollama.AsyncClient(host=self.ollama_url)
+        client = self.async_client or ollama.AsyncClient(host=self.ollama_url)
         response = await client.chat(
             model=self.model_name,
             messages=messages,
