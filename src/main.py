@@ -33,7 +33,7 @@ def print_stats():
 
     with db._connect() as conn:
         cur = conn.cursor()
-        for table in ["metadata", "papers", "labels", "questions", "metadata_labels"]:
+        for table in ["metadata", "papers", "labels", "questions", "metadata_labels", "labeling_queue"]:
             try:
                 cur.execute(f"SELECT COUNT(1) AS count FROM {table}")
                 row = cur.fetchone()
@@ -45,7 +45,7 @@ def print_stats():
     print("DATABASE STATISTIEKEN")
     print("=" * 60)
     print("Tabellen (aantal rijen):")
-    for tbl in ["metadata", "papers", "labels", "questions", "metadata_labels"]:
+    for tbl in ["metadata", "papers", "labels", "questions", "metadata_labels", "labeling_queue"]:
         print(f"  {tbl}: {table_counts.get(tbl, 0)}")
 
 
@@ -120,90 +120,76 @@ def import_labels_questions() -> int:
     return added
 
 
-def run_labeling(
-    question_id: int,
-    *,
-    limit: int | None = None,
-    offset: int = 0,
-    batch_size: int = 500,
-    db: PaperDatabase | None = None,
-    llm: LLMChecker | None = None,
-) -> dict:
-    """Label alle metadata voor een gegeven question.
+def run_labeling(db: PaperDatabase | None = None, llm: LLMChecker | None = None) -> dict:
+    """Verwerk labeling jobs rij-voor-rij vanuit labeling_queue.
 
-    - Bestaande metadata_labels voor dit label worden overgeslagen (resume-vriendelijk).
-    - LLM-calls gebeuren sequentieel.
-    - Resultaat is een klein statistieken-dict.
+    - Geen parameters nodig; neemt volgende job uit de queue totdat leeg.
+    - LLM-calls zijn sequentieel per rij.
+    - Retourneert een statistieken-dict.
     """
     logging.config.dictConfig(LOGGING_CONFIG)
     logger = logging.getLogger(__name__)
 
-    if not isinstance(question_id, int) or question_id <= 0:
-        raise ValueError("question_id moet een positief integer zijn")
-
     database = db or PaperDatabase()
     checker = llm or LLMChecker()
 
-    # 1) Haal vraag + label
-    qrow = database.get_question_by_id(question_id)
-    if not qrow:
-        raise ValueError(f"question_id niet gevonden: {question_id}")
-    prompt: str = qrow["prompt"]
-    label_id: int = int(qrow["label_id"])  # type: ignore[assignment]
-
-    # 2) Bepaal al-gelabelde metadata_ids voor dit label
-    already_labeled_ids = set(database.get_metadata_ids_by_label(label_id))
-
-    logger.info(
-        "🔖 Start labeling: question_id=%s, label_id=%s, limit=%s, offset=%s, batch_size=%s",
-        question_id,
-        label_id,
-        limit,
-        offset,
-        batch_size,
-    )
-
     stats = {
-        "question_id": question_id,
-        "label_id": label_id,
         "processed": 0,
-        "skipped_existing": 0,
         "labeled": 0,
+        "skipped_missing": 0,
         "errors": 0,
     }
 
-    # 3) Itereer metadata in batches
-    for batch in database.iter_metadata_records(offset=offset, limit=limit, batch_size=batch_size):
-        logger.info("Batch ontvangen: %s records", len(batch))
-        for record in batch:
-            metadata_id = record.get("id")
-            if not metadata_id:
+    logger.info("🔖 Start labeling vanuit labeling_queue (rij-voor-rij)")
+
+    while True:
+        job = database.pop_next_labeling_job()
+        if not job:
+            break
+        metadata_id = job.get("metadata_id")
+        question_id = job.get("question_id")
+        if not metadata_id or not isinstance(question_id, int):
+            stats["skipped_missing"] += 1
+            continue
+
+        try:
+            qrow = database.get_question_by_id(question_id)
+            if not qrow:
+                stats["skipped_missing"] += 1
                 continue
-            if metadata_id in already_labeled_ids:
-                stats["skipped_existing"] += 1
+            prompt: str = qrow["prompt"]
+            label_id: int = int(qrow["label_id"])  # type: ignore[assignment]
+
+            record = database.get_metadata_by_id(str(metadata_id))
+            if not record:
+                stats["skipped_missing"] += 1
                 continue
 
-            try:
-                mdl = checker.classify_record_to_metadata_label(
-                    question=prompt, metadata_record=record, label_id=label_id
-                )
-                stats["processed"] += 1
-                if not bool(mdl.get("_applicable")):
-                    continue
-                confidence = mdl.get("confidence_score")
-                database.upsert_metadata_label(
-                    metadata_id=metadata_id, label_id=label_id, confidence_score=confidence
-                )
-                stats["labeled"] += 1
-            except Exception as exc:
-                logger.warning("Labeling fout voor %s: %s", metadata_id, exc)
-                stats["errors"] += 1
+            mdl = checker.classify_record_to_metadata_label(
+                question=prompt, metadata_record=record, label_id=label_id
+            )
+            stats["processed"] += 1
+            if not bool(mdl.get("_applicable")):
+                continue
+            confidence = mdl.get("confidence_score")
+            database.upsert_metadata_label(
+                metadata_id=metadata_id, label_id=label_id, confidence_score=confidence
+            )
+            stats["labeled"] += 1
+        except Exception as exc:
+            logger.warning(
+                "Labeling fout voor metadata_id=%s (question_id=%s): %s",
+                metadata_id,
+                question_id,
+                exc,
+            )
+            stats["errors"] += 1
 
     logger.info(
-        "✅ Labeling klaar: processed=%s, labeled=%s, skipped_existing=%s, errors=%s",
+        "✅ Labeling klaar: processed=%s, labeled=%s, skipped_missing=%s, errors=%s",
         stats["processed"],
         stats["labeled"],
-        stats["skipped_existing"],
+        stats["skipped_missing"],
         stats["errors"],
     )
     return stats
@@ -217,7 +203,7 @@ def list_questions() -> list[str]:
     return [f"id: {r['id']}, name: {r['name']}, label: {r['label_name']}" for r in rows]
 
 
-def run_prepare_metadata_labeling(question_id: int, date_after: str = "2025-10-01") -> int:
+def run_prepare_metadata_labeling(question_id: int, date_after: str = "2025-09-01") -> int:
     """Vul labeling_queue met (metadata_id, question_id) voor metadata na date_after."""
     logging.config.dictConfig(LOGGING_CONFIG)
     logger = logging.getLogger(__name__)
@@ -242,16 +228,9 @@ def main():
     logger.info("🚀 GitHub Copilot Metastudy - Pipeline Start")
     logger.info("=" * 70)
 
-    # Eenvoudige CLI-hook voor labeling: python -m src.main label <question_id> [limit] [offset] [batch]
-    if len(sys.argv) >= 3 and sys.argv[1] == "label":
-        try:
-            qid = int(sys.argv[2])
-        except Exception:
-            raise SystemExit("Gebruik: python -m src.main label <question_id> [limit] [offset] [batch]")
-        lim = int(sys.argv[3]) if len(sys.argv) >= 4 and sys.argv[3].isdigit() else None
-        off = int(sys.argv[4]) if len(sys.argv) >= 5 and sys.argv[4].isdigit() else 0
-        bsz = int(sys.argv[5]) if len(sys.argv) >= 6 and sys.argv[5].isdigit() else 500
-        res = run_labeling(qid, limit=lim, offset=off, batch_size=bsz)
+    # Eenvoudige CLI-hook voor labeling vanuit queue: python -m src.main label
+    if len(sys.argv) >= 2 and sys.argv[1] == "label":
+        res = run_labeling()
         print(res)
         return
 

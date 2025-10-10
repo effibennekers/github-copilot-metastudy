@@ -69,3 +69,27 @@ class QueuesRepository(BaseDatabase):
             return len(metadata_ids)
 
 
+    def pop_next_labeling_job(self) -> dict | None:
+        """Haal het volgende labeling job item op en verwijder het uit de queue.
+
+        Retourneert dict met keys: metadata_id, question_id, of None als de queue leeg is.
+        """
+        with self._connect() as conn:
+            cur = conn.cursor()
+            # pak één item deterministisch
+            cur.execute(
+                "SELECT metadata_id, question_id FROM labeling_queue ORDER BY metadata_id, question_id LIMIT 1"
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            metadata_id = row["metadata_id"]
+            question_id = int(row["question_id"])  # dict_row
+            # verwijder dit item
+            cur.execute(
+                "DELETE FROM labeling_queue WHERE metadata_id = %s AND question_id = %s",
+                (metadata_id, question_id),
+            )
+            conn.commit()
+            return {"metadata_id": metadata_id, "question_id": question_id}
+
