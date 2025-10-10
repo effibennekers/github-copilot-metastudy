@@ -215,6 +215,12 @@ def list_questions() -> list[dict]:
     db = PaperDatabase()
     return db.list_questions()
 
+
+def list_questions_lines() -> list[str]:
+    """Retourneer leesbare regels: "id: <id>, name: <name>, label: <label_name>"""
+    rows = list_questions()
+    return [f"id: {r['id']}, name: {r['name']}, label: {r['label_name']}" for r in rows]
+
 def main():
     """Hoofd workflow voor metastudy"""
     # Setup logging first
