@@ -7,6 +7,22 @@ from .base import BaseDatabase
 
 
 class LabelsRepository(BaseDatabase):
+    def get_question_by_id(self, question_id: int) -> dict | None:
+        """Haal een question op met bijbehorende label_id.
+
+        Retourneert dict met keys: id, prompt, label_id
+        """
+        if not isinstance(question_id, int) or question_id <= 0:
+            raise ValueError("question_id moet een positief integer zijn")
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, prompt, label_id FROM questions WHERE id = %s",
+                (question_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
     def get_or_create_label(self, name: str) -> int:
         if not name:
             raise ValueError("label name mag niet leeg zijn")
@@ -81,5 +97,3 @@ class LabelsRepository(BaseDatabase):
             cur = conn.cursor()
             cur.execute("SELECT metadata_id FROM metadata_labels WHERE label_id = %s", (label_id,))
             return [row["metadata_id"] for row in cur.fetchall()]
-
-

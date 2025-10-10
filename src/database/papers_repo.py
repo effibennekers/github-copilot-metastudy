@@ -26,16 +26,16 @@ class PapersRepository(BaseDatabase):
                 except Exception:
                     derived_metadata_id = None
 
-            metadata_id_value = explicit_metadata_id if explicit_metadata_id is not None else derived_metadata_id
+            metadata_id_value = (
+                explicit_metadata_id if explicit_metadata_id is not None else derived_metadata_id
+            )
 
-            sql = (
-                """
+            sql = """
                 INSERT INTO papers (
                     arxiv_id, download_status, download_type, llm_check_status,
                     created_at, updated_at, metadata_id
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """
-            )
             cur = conn.cursor()
             cur.execute(
                 sql,
@@ -104,5 +104,3 @@ class PapersRepository(BaseDatabase):
             cur.execute("SELECT * FROM papers WHERE arxiv_id = %s", (arxiv_id,))
             row = cur.fetchone()
             return dict(row) if row else None
-
-

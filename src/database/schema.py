@@ -103,23 +103,25 @@ class SchemaManager(BaseDatabase):
             cur.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON papers(created_at)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_papers_metadata_id ON papers(metadata_id)")
 
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_metadata_categories ON metadata(categories)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_metadata_update_date ON metadata(update_date)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_metadata_categories ON metadata(categories)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_metadata_update_date ON metadata(update_date)"
+            )
             cur.execute("CREATE INDEX IF NOT EXISTS idx_metadata_doi ON metadata(doi)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_metadata_created_at ON metadata(created_at)")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_metadata_created_at ON metadata(created_at)"
+            )
 
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_labels_name ON labels(name)")
             cur.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_questions_prompt_label ON questions(prompt, label_id)"
             )
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_questions_label_id ON questions(label_id)"
-            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_questions_label_id ON questions(label_id)")
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_metadata_labels_label_id ON metadata_labels(label_id)"
             )
 
             conn.commit()
         self.logger.info("Database initialized (PostgreSQL)")
-
-

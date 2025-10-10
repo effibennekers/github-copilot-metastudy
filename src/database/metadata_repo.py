@@ -20,8 +20,7 @@ class MetadataRepository(BaseDatabase):
             metadata_record.get("authors_parsed", []), separators=(",", ":")
         )
         with self._connect() as conn:
-            sql = (
-                """
+            sql = """
                 INSERT INTO metadata (
                     id, submitter, authors, title, comments, journal_ref, doi, report_no,
                     categories, license, abstract, versions, update_date, authors_parsed,
@@ -30,7 +29,6 @@ class MetadataRepository(BaseDatabase):
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS DATE), %s, %s, %s
                 )
                 """
-            )
             cur = conn.cursor()
             cur.execute(
                 sql,
@@ -99,8 +97,7 @@ class MetadataRepository(BaseDatabase):
                 )
             if not rows_to_insert:
                 return 0
-            sql = (
-                """
+            sql = """
                 INSERT INTO metadata (
                     id, submitter, authors, title, comments, journal_ref, doi, report_no,
                     categories, license, abstract, versions, update_date, authors_parsed,
@@ -109,7 +106,6 @@ class MetadataRepository(BaseDatabase):
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS DATE), %s, %s, %s
                 )
                 """
-            )
             cur.executemany(sql, rows_to_insert)
             conn.commit()
             inserted = len(rows_to_insert)
@@ -151,7 +147,9 @@ class MetadataRepository(BaseDatabase):
             cur = conn.cursor()
             cur.execute("SELECT COUNT(1) AS count FROM metadata")
             stats["total_metadata"] = cur.fetchone()["count"]
-            cur.execute("SELECT COUNT(1) AS count FROM metadata WHERE doi IS NOT NULL AND doi != ''")
+            cur.execute(
+                "SELECT COUNT(1) AS count FROM metadata WHERE doi IS NOT NULL AND doi != ''"
+            )
             stats["with_doi"] = cur.fetchone()["count"]
             cur.execute("SELECT COUNT(1) AS count FROM metadata WHERE submitter IS NULL")
             stats["null_submitter"] = cur.fetchone()["count"]
@@ -166,5 +164,3 @@ class MetadataRepository(BaseDatabase):
             )
             stats["top_categories"] = {row["categories"]: row["count"] for row in cur.fetchall()}
             return stats
-
-

@@ -12,5 +12,3 @@ class PaperDatabase(SchemaManager, MetadataRepository, PapersRepository, LabelsR
     def __init__(self):
         super().__init__()
         self.init_database()
-
-

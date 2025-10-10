@@ -17,9 +17,11 @@ class BaseDatabase:
         """Return a PostgreSQL connection with dict_row factory."""
         pg = DATABASE_CONFIG["pg"]
         conn = psycopg.connect(
-            host=pg["host"], port=pg["port"], dbname=pg["dbname"], user=pg["user"], password=pg["password"]
+            host=pg["host"],
+            port=pg["port"],
+            dbname=pg["dbname"],
+            user=pg["user"],
+            password=pg["password"],
         )
         conn.row_factory = dict_row
         return conn
-
-
