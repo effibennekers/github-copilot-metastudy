@@ -49,20 +49,7 @@ class LLMChecker:
             {"role": "user", "content": user_msg},
         ]
 
-    def _chat(self, messages: list[dict]) -> str:
-        client = ollama.Client(host=self.ollama_url)
-        response = client.chat(
-            model=self.model_name,
-            messages=messages,
-            options={
-                "temperature": self.config.get("temperature", 0.1),
-                "num_predict": self.config.get("num_predict", 64),
-                "format": self.config.get("format", "json"),
-                "top_p": self.config.get("top_p", 0.9),
-                "top_k": self.config.get("top_k", 40),
-            },
-        )
-        return ((response or {}).get("message") or {}).get("content", "").strip()
+    # Sync chat verwijderd; gebruik uitsluitend _chat_async
 
     async def _chat_async(self, messages: list[dict]) -> str:
         client = ollama.AsyncClient(host=self.ollama_url)
@@ -156,48 +143,7 @@ class LLMChecker:
         abstract = (metadata_record or {}).get("abstract") or ""
         return title, abstract
 
-    def classify_title_abstract_structured(
-        self, question: str, title: str, abstract: str
-    ) -> Dict[str, object]:
-        """
-        Gestructureerde classificatie met binaire answer plus extra waarden.
-
-        Returns:
-            dict: {
-              "answer_value": bool|None,
-              "confidence_score": float|None,  # binnen [0,1]
-              "llm_model": str,
-            }
-        """
-        result = self._default_structured()
-        if not self.is_enabled():
-            self.logger.info("LLM checker disabled; returning default structured result")
-            result["answer_value"] = False
-            return result
-
-        if not title or not abstract or not question:
-            self.logger.warning(
-                "Missing question/title/abstract; returning default structured result"
-            )
-            result["answer_value"] = False
-            return result
-
-        try:
-            messages = self._build_messages(question=question, title=title, abstract=abstract)
-            self.logger.info(messages)
-            content = self._chat(messages)
-            ans, conf = self._parse_structured(content)
-            self.logger.info("Answer: %s, Confidence: %s", ans, conf)
-            if ans is None:
-                self.logger.warning("Unclear LLM response; defaulting answer to False")
-                ans = False
-            result["answer_value"] = bool(ans)
-            result["confidence_score"] = conf
-            return result
-        except Exception as exc:
-            self.logger.error("LLM classification failed: %s", exc)
-            result["answer_value"] = False
-            return result
+    # Sync classificatie verwijderd; gebruik uitsluitend async variant
 
     async def classify_title_abstract_structured_async(
         self, question: str, title: str, abstract: str
@@ -233,95 +179,16 @@ class LLMChecker:
             result["answer_value"] = False
             return result
 
-    def classify_title_abstract_boolean(self, question: str, title: str, abstract: str) -> bool:
-        """
-        Beantwoord een binaire vraag over een paper op basis van titel en abstract.
+    # Sync convenience verwijderd
 
-        Returns:
-            bool: True als het antwoord 'ja' is, anders False.
-        """
-        structured = self.classify_title_abstract_structured(
-            question=question, title=title, abstract=abstract
-        )
-        return bool(structured.get("answer_value") or False)
+    # Sync convenience verwijderd
 
-    def classify_metadata_record_boolean(self, question: str, metadata_record: dict) -> bool:
-        """
-        Convenience: classificeer rechtstreeks een metadata-record met 'title' en 'abstract'.
-        """
-        title = metadata_record.get("title") or ""
-        abstract = metadata_record.get("abstract") or ""
-        if not title or not abstract:
-            self.logger.warning("metadata_record mist 'title' of 'abstract'")
-            return False
-        return self.classify_title_abstract_boolean(
-            question=question, title=title, abstract=abstract
-        )
-
-    def classify_metadata_record_structured(
-        self, question: str, metadata_record: dict
-    ) -> Dict[str, object]:
-        """
-        Gestructureerde classificatie direct op een metadata-record met 'title' en 'abstract'.
-        """
-        title, abstract = self._extract_title_abstract(metadata_record)
-        if not title or not abstract:
-            self.logger.warning("metadata_record mist 'title' of 'abstract'")
-            return {"answer_value": False, "confidence_score": None, "llm_model": self.model_name}
-        return self.classify_title_abstract_structured(
-            question=question, title=title, abstract=abstract
-        )
+    # Sync convenience verwijderd
 
     # =====================================
     # metadata_labels record helpers (DB schema)
     # =====================================
 
-    def classify_to_metadata_label_record(
-        self,
-        question: str,
-        title: str,
-        abstract: str,
-        metadata_id: str,
-        label_id: int,
-    ) -> Dict[str, object]:
-        """
-        Classificeer en retourneer een dict die overeenkomt met het `metadata_labels` schema:
+    # Sync helper verwijderd
 
-        Keys: metadata_id, label_id, confidence_score, created_at, updated_at
-        """
-        structured = self.classify_title_abstract_structured(
-            question=question, title=title, abstract=abstract
-        )
-        now_iso = datetime.now().isoformat()
-        # Alleen een labelrecord teruggeven als de classificatie positief is
-        if not bool(structured.get("answer_value")):
-            return {
-                "metadata_id": metadata_id,
-                "label_id": label_id,
-                "confidence_score": None,
-                "created_at": now_iso,
-                "updated_at": now_iso,
-                "_applicable": False,  # hint voor aanroepende code
-            }
-        return {
-            "metadata_id": metadata_id,
-            "label_id": label_id,
-            "confidence_score": structured.get("confidence_score"),
-            "created_at": now_iso,
-            "updated_at": now_iso,
-            "_applicable": True,
-        }
-
-    def classify_record_to_metadata_label(
-        self, question: str, metadata_record: dict, label_id: int
-    ) -> Dict[str, object]:
-        """Convenience: neem een metadata-record en bouw een `metadata_labels`-vormig object."""
-        title, abstract = self._extract_title_abstract(metadata_record)
-        metadata_id = metadata_record.get("id")
-        return self.classify_to_metadata_label_record(
-            question=question,
-            title=title,
-            abstract=abstract,
-            metadata_id=metadata_id,
-            label_id=label_id,
-        )
+    # Sync helper verwijderd
