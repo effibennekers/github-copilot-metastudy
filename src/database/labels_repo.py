@@ -149,3 +149,23 @@ class LabelsRepository(BaseDatabase):
             cur = conn.cursor()
             cur.execute("SELECT metadata_id FROM metadata_labels WHERE label_id = %s", (label_id,))
             return [row["metadata_id"] for row in cur.fetchall()]
+
+    def list_questions(self) -> List[dict]:
+        """Retourneer lijst van questions inclusief labelnaam.
+
+        Keys: id, name, label_name
+        """
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT q.id, q.name, l.name AS label_name
+                FROM questions q
+                JOIN labels l ON q.label_id = l.id
+                ORDER BY l.name, q.name, q.id
+                """
+            )
+            return [
+                {"id": int(row["id"]), "name": row["name"], "label_name": row["label_name"]}
+                for row in cur.fetchall()
+            ]

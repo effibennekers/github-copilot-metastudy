@@ -210,27 +210,10 @@ def run_labeling(
 
 
 def list_questions() -> list[dict]:
-    """Geef een lijst terug met questions inclusief labelnaam.
-
-    Retourneert lijst van dicts met keys: id, name, label_name.
-    """
+    """Geef een lijst terug met questions inclusief labelnaam (via repository)."""
     logging.config.dictConfig(LOGGING_CONFIG)
     db = PaperDatabase()
-    with db._connect() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT q.id, q.name, l.name AS label_name
-            FROM questions q
-            JOIN labels l ON q.label_id = l.id
-            ORDER BY l.name, q.name, q.id
-            """
-        )
-        rows = cur.fetchall()
-        return [
-            {"id": int(row["id"]), "name": row["name"], "label_name": row["label_name"]}
-            for row in rows
-        ]
+    return db.list_questions()
 
 def main():
     """Hoofd workflow voor metastudy"""
