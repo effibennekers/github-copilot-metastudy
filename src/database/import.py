@@ -176,7 +176,7 @@ def prepare_paper_from_metadata(batch_size: int = 5000, limit: Optional[int] = N
     return created
 
 
-def seed_labels_questions(labels_path: Optional[str] = None) -> int:
+def import_labels_questions(labels_path: Optional[str] = None) -> int:
     """Laad labels en questions uit data/labels.json en seed de database.
 
     Returns: aantal (label, questions) records dat is toegevoegd (som van nieuwe labels en nieuwe questions).

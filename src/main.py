@@ -103,7 +103,7 @@ def run_paper_preparation(batch_size: int | None = None, limit: int | None = Non
     return created
 
 
-def seed_labels_questions() -> int:
+def import_labels_questions() -> int:
     """Seed labels en questions vanuit data/labels.json."""
     logging.config.dictConfig(LOGGING_CONFIG)
     logger = logging.getLogger(__name__)
@@ -112,11 +112,11 @@ def seed_labels_questions() -> int:
     project_root = Path(__file__).resolve().parent.parent
     labels_path = str(Path(project_root / "data" / "labels.json"))
 
-    logger.info("🌱 Seeding labels/questions start")
+    logger.info("🌱 Importing labels/questions start")
     logger.info(f"  - Labels: {labels_path}")
 
-    added = db_import.seed_labels_questions(labels_path=labels_path)
-    logger.info(f"✅ Seeding voltooid: {added} items toegevoegd/gededupliceerd")
+    added = db_import.import_labels_questions(labels_path=labels_path)
+    logger.info(f"✅ Import voltooid: {added} items toegevoegd/gededupliceerd")
     return added
 
 

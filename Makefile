@@ -62,7 +62,6 @@ $(VENV_DIR)/bin/activate: requirements.txt
 	$(VENV_PYTHON) -m pip install -r requirements.txt
 	@touch $(VENV_DIR)/bin/activate
 
-# Pipeline stappen
 .PHONY: status
 status: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📊 Checking database status...$(NC)"
@@ -98,13 +97,14 @@ prepare-download: $(VENV_DIR)/bin/activate
 		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation($$ARGS)"; \
 	fi
 
+
 .PHONY: import-labels
 import-labels: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🌱 Seeding labels and questions...$(NC)"
 	@if [ -z "$(LABELS)" ]; then \
-		$(VENV_PYTHON) -c "from src.main import seed_labels_questions; seed_labels_questions()"; \
+		$(VENV_PYTHON) -c "from src.main import import_labels_questions; import_labels_questions()"; \
 	else \
-		$(VENV_PYTHON) -c "from src.main import seed_labels_questions; seed_labels_questions(labels_path='$(LABELS)')"; \
+		$(VENV_PYTHON) -c "from src.main import import_labels_questions; import_labels_questions(labels_path='$(LABELS)')"; \
 	fi
 
 # Development commands
