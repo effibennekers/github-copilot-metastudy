@@ -108,7 +108,7 @@ prepare-labeling: $(VENV_DIR)/bin/activate
 	@if [ -z "$(Q)" ]; then \
 		echo "$(RED)❌ Provide question id via Q=<id>$(NC)"; exit 1; \
 	fi
-	@if [ -z "$(DATE)" ]; then DATE=2025-10-01; else DATE=$(DATE); fi; \
+	@if [ -z "$(DATE)" ]; then DATE=2025-09-01; else DATE=$(DATE); fi; \
 	$(VENV_PYTHON) -c "from src.main import run_prepare_metadata_labeling; print(run_prepare_metadata_labeling(question_id=int('$(Q)'), date_after='$$DATE'))"
 
 .PHONY: import-labels
