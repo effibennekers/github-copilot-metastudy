@@ -25,6 +25,7 @@ help:
 	@echo "$(GREEN)Pipeline Commands:$(NC)"
 	@echo "  import-labels     - Seed labels en questions vanuit data/labels.json"
 	@echo "  import-metadata   - Importeer metadata JSON met schema-validatie"
+	@echo "  list-questions    - Toon alle questions met labelnaam"
 	@echo "  prepare-download  - Maak papers aan op basis van metadata"
 	@echo "  status            - Toon database statistieken"
 	@echo ""
@@ -38,6 +39,7 @@ help:
 	@echo "  make status           # Check huidige status"
 	@echo "  make import-metadata  # Metadata importeren met validatie"
 	@echo "  make prepare-download # Maak papers aan op basis van metadata"
+	@echo "  make list-questions   # Toon alle questions"
 
 # Setup en installatie
 .PHONY: refresh
@@ -124,6 +126,11 @@ format: $(VENV_DIR)/bin/activate
 	$(VENV_PYTHON) -m black src/ --line-length=100
 
 # Utility commands
+
+.PHONY: list-questions
+list-questions: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)❓ Listing questions...$(NC)"
+	@$(VENV_PYTHON) -c "import json; from src.main import list_questions; print(json.dumps(list_questions(), ensure_ascii=False, indent=2))"
 
 .PHONY: install-ollama
 install-ollama:
