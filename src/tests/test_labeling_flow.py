@@ -60,5 +60,3 @@ def test_run_labeling_smoke(monkeypatch):
     assert stats["skipped_existing"] == 1
     assert stats["labeled"] == 1
     assert db.upserts == [("B", 3, 0.9)]
-
-

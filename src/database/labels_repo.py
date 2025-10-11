@@ -59,6 +59,7 @@ class LabelsRepository(BaseDatabase):
                 "CREATE INDEX IF NOT EXISTS idx_metadata_labels_label_id ON metadata_labels(label_id)"
             )
             conn.commit()
+
     def get_question_by_id(self, question_id: int) -> dict | None:
         """Haal een question op met bijbehorende label_id.
 

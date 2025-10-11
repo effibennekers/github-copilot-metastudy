@@ -45,6 +45,7 @@ class MetadataRepository(BaseDatabase):
                 "CREATE INDEX IF NOT EXISTS idx_metadata_created_at ON metadata(created_at)"
             )
             conn.commit()
+
     def metadata_exists(self, metadata_id: str) -> bool:
         with self._connect() as conn:
             cur = conn.cursor()

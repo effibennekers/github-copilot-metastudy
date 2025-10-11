@@ -26,20 +26,13 @@ class PapersRepository(BaseDatabase):
                 """
             )
             # indexen
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_download_status ON papers(download_status)"
-            )
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_download_type ON papers(download_type)"
-            )
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_llm_status ON papers(llm_check_status)"
-            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_download_status ON papers(download_status)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_download_type ON papers(download_type)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_status ON papers(llm_check_status)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON papers(created_at)")
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_papers_metadata_id ON papers(metadata_id)"
-            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_papers_metadata_id ON papers(metadata_id)")
             conn.commit()
+
     def paper_exists(self, arxiv_id: str) -> bool:
         with self._connect() as conn:
             cur = conn.cursor()

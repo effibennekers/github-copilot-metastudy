@@ -35,7 +35,14 @@ def print_stats():
 
     with db._connect() as conn:
         cur = conn.cursor()
-        for table in ["metadata", "papers", "labels", "questions", "metadata_labels", "labeling_queue"]:
+        for table in [
+            "metadata",
+            "papers",
+            "labels",
+            "questions",
+            "metadata_labels",
+            "labeling_queue",
+        ]:
             try:
                 cur.execute(f"SELECT COUNT(1) AS count FROM {table}")
                 row = cur.fetchone()
@@ -217,7 +224,7 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
             metadata_id=j["metadata_id"], label_id=j["label_id"], confidence_score=confidence
         )
         stats["labeled"] += 1
-        logger.info("%s ✅ %s", counter, j["title"]) 
+        logger.info("%s ✅ %s", counter, j["title"])
 
     logger.info(
         "✅ Labeling klaar: processed=%s, labeled=%s, skipped_missing=%s, errors=%s",
@@ -255,6 +262,7 @@ def run_prepare_metadata_labeling(question_id: int, date_after: str = "2025-09-0
     enqueued = db.prepare_metadata_labeling(question_id=question_id, date_after=date_after)
     logger.info("✅ labeling_queue gevuld: %s items", enqueued)
     return enqueued
+
 
 def main():
     """Hoofd workflow voor metastudy"""

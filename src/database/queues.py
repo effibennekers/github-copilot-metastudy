@@ -46,11 +46,13 @@ class QueuesRepository(BaseDatabase):
             cur = conn.cursor()
             if date_after:
                 cur.execute(
-                    "SELECT id FROM metadata WHERE update_date > CAST(%s AS DATE)",
+                    "SELECT id FROM metadata WHERE update_date > CAST(%s AS DATE) AND (string_to_array(categories, ' ') @> ARRAY['cs.AI'] OR string_to_array(categories, ' ') @> ARRAY['cs.SE'])",
                     (date_after,),
                 )
             else:
-                cur.execute("SELECT id FROM metadata")
+                cur.execute(
+                    "SELECT id FROM metadata WHERE (string_to_array(categories, ' ') @> ARRAY['cs.AI'] OR string_to_array(categories, ' ') @> ARRAY['cs.SE'])"
+                )
 
             metadata_ids: List[str] = [row["id"] for row in cur.fetchall()]
             if not metadata_ids:
@@ -67,7 +69,6 @@ class QueuesRepository(BaseDatabase):
             )
             conn.commit()
             return len(metadata_ids)
-
 
     def pop_next_labeling_job(self) -> dict | None:
         """Haal het volgende labeling job item op en verwijder het uit de queue.
@@ -92,4 +93,3 @@ class QueuesRepository(BaseDatabase):
             )
             conn.commit()
             return {"metadata_id": metadata_id, "question_id": question_id}
-

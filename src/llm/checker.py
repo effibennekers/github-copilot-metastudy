@@ -25,10 +25,7 @@ class LLMChecker:
         except Exception:
             self.async_client = None
 
-        self.logger.info(
-            f"LLM Checker initialized: {self.ollama_url} with model {self.model_name}"
-        )
-
+        self.logger.info(f"LLM Checker initialized: {self.ollama_url} with model {self.model_name}")
 
     def _build_messages(self, question: str, title: str, abstract: str) -> list[dict]:
         system_msg = (
@@ -36,7 +33,7 @@ class LLMChecker:
             "Your task is to analyze the provided TEXT to answer the given QUESTION. "
             "You **MUST** respond in strict JSON format. "
             "No extra text, explanation, introduction, or markdown is allowed. "
-            "The JSON schema is: {\"answer\": true|false, \"confidence\": number}. "
+            'The JSON schema is: {"answer": true|false, "confidence": number}. '
             "The 'confidence' must be a floating-point number between 0.00 and 1.00, "
             "reflecting the certainty of your 'answer'. "
             "**Respond directly and ONLY with the JSON output.**"
@@ -47,7 +44,6 @@ class LLMChecker:
             {"role": "user", "content": user_msg},
         ]
 
-
     async def _chat_async(self, messages: list[dict]) -> str:
         if self.async_client is None:
             self.async_client = ollama.AsyncClient(host=self.ollama_url)
@@ -55,7 +51,7 @@ class LLMChecker:
             model=self.model_name,
             messages=messages,
             options={
-                "temperature": LLM_CONFIG.get("temperature", 0.1),
+                "temperature": LLM_CONFIG.get("temperature", 0.0),
                 "num_predict": LLM_CONFIG.get("num_predict", 32),
                 "format": LLM_CONFIG.get("format", "json"),
                 "top_p": LLM_CONFIG.get("top_p", 0.9),
@@ -74,7 +70,6 @@ class LLMChecker:
             return m.group(1).strip()
         return s
 
-
     def _parse_structured(self, text: str) -> Tuple[Optional[bool], Optional[float]]:
         """Parseer JSON met velden {answer: bool|str, confidence: number}.
 
@@ -89,7 +84,6 @@ class LLMChecker:
         except Exception:
             return None, None
 
-
     def _coerce_answer_bool(self, value: Any) -> Optional[bool]:
         if isinstance(value, bool):
             return bool(value)
@@ -100,7 +94,6 @@ class LLMChecker:
             if low in ("false", "no"):
                 return False
         return None
-
 
     def _coerce_confidence(self, value: Any) -> Optional[float]:
         if value is None:
@@ -117,7 +110,7 @@ class LLMChecker:
     def _default_structured(self) -> Dict[str, object]:
         return {"answer_value": None, "confidence_score": None}
 
-    # Sync classificatie verwijderd; gebruik uitsluitend async 
+    # Sync classificatie verwijderd; gebruik uitsluitend async
     async def classify_title_abstract_structured_async(
         self, question: str, title: str, abstract: str
     ) -> Dict[str, object]:
@@ -134,7 +127,6 @@ class LLMChecker:
         try:
             messages = self._build_messages(question=question, title=title, abstract=abstract)
             content = await self._chat_async(messages)
-            self.logger.info("Content: %s", content)
             sanitized = self._strip_code_fences(content)
             ans, conf = self._parse_structured(sanitized)
             if ans is None:

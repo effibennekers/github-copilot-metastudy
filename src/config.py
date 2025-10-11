@@ -98,7 +98,7 @@ LOGGING_CONFIG = {
 
 # LLM Configuration (voor kwaliteitscontrole en analyse)
 LLM_CONFIG = {
-    "model_name": "llama3:8b-instruct-q4_0",
+    "model_name": "gemma3:12b-it-qat",
     "ollama_api_base_url": "http://localhost:11434",
     "temperature": 0.1,
     "batch_size": 2,
