@@ -29,6 +29,7 @@ help:
 	@echo "  prepare-labeling  - Vul labeling_queue (default: date_after=2025-09-01)"
 	@echo "  list-questions    - Toon alle questions met labelnaam"
 	@echo "  prepare-download  - Vul download_queue op basis van label"
+	@echo "  run-download      - Download tarballs uit download_queue (opt: N=limiet)"
 	@echo "  status            - Toon database statistieken"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
@@ -44,6 +45,8 @@ help:
 	@echo "  make run-labeling JOBS=5 # Verwerk 5 labeling jobs"
 	@echo "  make prepare-labeling Q=42 # Queue labeling jobs na 2025-09-01 voor vraag 42"
 	@echo "  make list-questions   # Toon alle questions"
+	@echo "  make run-download     # Download volgens config (DOWNLOAD_CONFIG.max_items)"
+	@echo "  make run-download N=5 # Download maximaal 5 items"
 
 # Setup en installatie
 .PHONY: refresh
