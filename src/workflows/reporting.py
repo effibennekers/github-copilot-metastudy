@@ -16,6 +16,7 @@ def print_stats() -> None:
             "questions",
             "metadata_labels",
             "labeling_queue",
+            "download_queue",
         ]:
             try:
                 cur.execute(f"SELECT COUNT(1) AS count FROM {table}")
@@ -28,7 +29,15 @@ def print_stats() -> None:
     print("DATABASE STATISTIEKEN")
     print("=" * 60)
     print("Tabellen (aantal rijen):")
-    for tbl in ["metadata", "papers", "labels", "questions", "metadata_labels", "labeling_queue"]:
+    for tbl in [
+        "metadata",
+        "papers",
+        "labels",
+        "questions",
+        "metadata_labels",
+        "labeling_queue",
+        "download_queue",
+    ]:
         print(f"  {tbl}: {table_counts.get(tbl, 0)}")
 
 
