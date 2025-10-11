@@ -31,6 +31,7 @@ help:
 	@echo "  prepare-download  - Vul download_queue op basis van label"
 	@echo "  run-download      - Download tarballs uit download_queue (opt: N=limiet)"
 	@echo "  download-summary  - Toon aantallen en FAILED ids van download_queue"
+	@echo "  convert-md        - Converteer data/tex en data/pdf naar data/md"
 	@echo "  status            - Toon database statistieken"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
@@ -155,4 +156,9 @@ run-download: $(VENV_DIR)/bin/activate
 download-summary: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📬 Download queue summary...$(NC)"
 	@$(VENV_PYTHON) -m src.main download-summary
+
+.PHONY: convert-md
+convert-md: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)🛠️  Converting sources to Markdown...$(NC)"
+	@$(VENV_PYTHON) -m src.main convert-md
 

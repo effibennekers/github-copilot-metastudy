@@ -12,6 +12,7 @@ from src.workflows.imports import (
 from src.workflows.queues import run_prepare_metadata_labeling, run_prepare_paper_download
 from src.workflows.reporting import print_stats, list_questions, download_queue_summary
 from src.workflows.downloads import run_downloads
+from src.workflows.conversion import convert_to_md
 
 
 @click.group()
@@ -100,3 +101,9 @@ def cli_run_download(limit: int | None):
 def cli_download_summary():
     for line in download_queue_summary():
         click.echo(line)
+
+
+@cli.command("convert-md")
+def cli_convert_md():
+    stats = convert_to_md()
+    click.echo(stats)

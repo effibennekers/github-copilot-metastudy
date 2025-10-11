@@ -20,8 +20,10 @@ def run_downloads(limit: int | None = None) -> dict:
     db = PaperDatabase()
     client = ArxivClient()
 
-    max_items = int(limit) if isinstance(limit, int) and limit > 0 else int(
-        DOWNLOAD_CONFIG.get("max_items", 50)
+    max_items = (
+        int(limit)
+        if isinstance(limit, int) and limit > 0
+        else int(DOWNLOAD_CONFIG.get("max_items", 50))
     )
     tarball_dir = Path(DOWNLOAD_CONFIG.get("tarball_directory", "data/tarball"))
     tarball_dir.mkdir(parents=True, exist_ok=True)
@@ -48,7 +50,9 @@ def run_downloads(limit: int | None = None) -> dict:
         def _is_within_directory(directory: str, target: str) -> bool:
             abs_directory = os.path.abspath(directory)
             abs_target = os.path.abspath(target)
-            return os.path.commonpath([abs_directory]) == os.path.commonpath([abs_directory, abs_target])
+            return os.path.commonpath([abs_directory]) == os.path.commonpath(
+                [abs_directory, abs_target]
+            )
 
         def _safe_extract(tar: tarfile.TarFile, path: str) -> None:
             for member in tar.getmembers():
@@ -88,11 +92,9 @@ def run_downloads(limit: int | None = None) -> dict:
             shutil.rmtree(extracted_dir)
             logger.info("🧹 Removed extracted directory: %s", extracted_dir)
         except Exception as cleanup_err:  # pragma: no cover
-            logger.warning("Kon extracted directory niet verwijderen (%s): %s", extracted_dir, cleanup_err)
-
-    def _parse_version(aid: str) -> int:
-        m = re.search(r"v(\d+)$", aid)
-        return int(m.group(1)) if m else 1
+            logger.warning(
+                "Kon extracted directory niet verwijderen (%s): %s", extracted_dir, cleanup_err
+            )
 
     def _prev_version(aid: str) -> str | None:
         m = re.search(r"^(.*)v(\d+)$", aid)
@@ -107,10 +109,6 @@ def run_downloads(limit: int | None = None) -> dict:
     class Handler:
         def __init__(self, next_handler: "Handler | None" = None):
             self._next = next_handler
-
-        def set_next(self, next_handler: "Handler") -> "Handler":
-            self._next = next_handler
-            return next_handler
 
         def handle(self, aid: str) -> bool:
             if self._next:
@@ -177,13 +175,17 @@ def run_downloads(limit: int | None = None) -> dict:
                 None,
             )
             if existing is not None:
-                logger.info("📦 Tarball bestaat al voor %s: %s — overslaan en markeren als COMPLETED", arxiv_id, existing)
+                logger.info(
+                    "📦 Tarball bestaat al voor %s: %s — overslaan en markeren als COMPLETED",
+                    arxiv_id,
+                    existing,
+                )
                 db.set_download_status(arxiv_id, "COMPLETED")
                 stats["completed"] += 1
                 logger.info("✅ Download COMPLETED (reused): %s", arxiv_id)
                 continue
             # Chain opbouwen: tarball -> pdf -> prev tarball -> prev pdf
-            chain = TarballHandler( PdfHandler( PrevVersionTarballHandler( PrevVersionPdfHandler() ) ) )
+            chain = TarballHandler(PdfHandler(PrevVersionTarballHandler(PrevVersionPdfHandler())))
             success = chain.handle(arxiv_id)
 
             if success:
@@ -201,5 +203,3 @@ def run_downloads(limit: int | None = None) -> dict:
             stats["failed"] += 1
 
     return stats
-
-

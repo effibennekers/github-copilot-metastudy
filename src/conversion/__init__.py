@@ -1,19 +1,11 @@
 """
-Conversion module voor het converteren van bestanden en beheren van tarballs.
+Conversion module voor het converteren van bestanden.
 """
 
-from .converter import (
-    tex_naar_md,
-    html_naar_md,
-    pdf_naar_md,
-    pak_tarball_uit,
-    verwijder_uitgepakte_tarball,
-)
+from .tex_converter import tex_naar_md
+from .pdf_converter import pdf_naar_md
 
 __all__ = [
     "tex_naar_md",
-    "html_naar_md",
     "pdf_naar_md",
-    "pak_tarball_uit",
-    "verwijder_uitgepakte_tarball",
 ]
