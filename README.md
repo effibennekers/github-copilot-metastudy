@@ -15,6 +15,11 @@ prepare-labeling: Geef de question.id mee, zet labeling jobs klaar in de queue.
 Voer de labeling uit:
 run-labeling: Ga door de queue en voer de labeling uit.
 
+Download de papers:
+aan de hand van gewenste labels, ga door metadata_labels voor de metadata ids.
+maak daar een paper id van
+...
+
 CLI (click) via entrypoint:
 
 ```bash
@@ -27,8 +32,3 @@ python -m src.main label --jobs 10
 python -m src.main prepare-paper --batch-size 1000 --limit 5000
 python -m src.main prepare-download 3
 ```
-
-Download de papers:
-aan de hand van gewenste labels, ga door metadata_labels voor de metadata ids.
-maak daar een paper id van
-...
