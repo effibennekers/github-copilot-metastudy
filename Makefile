@@ -29,7 +29,6 @@ help:
 	@echo "  prepare-labeling  - Vul labeling_queue (default: date_after=2025-09-01)"
 	@echo "  list-questions    - Toon alle questions met labelnaam"
 	@echo "  prepare-download  - Vul download_queue op basis van label"
-	@echo "  prepare-paper     - Maak paper records aan op basis van metadata"
 	@echo "  status            - Toon database statistieken"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
@@ -41,7 +40,6 @@ help:
 	@echo "  make refresh          # Reset omgeving en installeer dependencies"
 	@echo "  make status           # Check huidige status"
 	@echo "  make import-metadata  # Metadata importeren met validatie"
-	@echo "  make prepare-download # Maak papers aan op basis van metadata"
 	@echo "  make run-labeling        # Verwerk 10 labeling jobs (default)"
 	@echo "  make run-labeling JOBS=5 # Verwerk 5 labeling jobs"
 	@echo "  make prepare-labeling Q=42 # Queue labeling jobs na 2025-09-01 voor vraag 42"
@@ -87,18 +85,6 @@ import-metadata: $(VENV_DIR)/bin/activate
 		$(VENV_PYTHON) -m src.main import-metadata $$ARGS; \
 	fi
 
-.PHONY: prepare-download
-prepare-paper: $(VENV_DIR)/bin/activate
-	@echo "$(BLUE)🧩 Preparing paper records from metadata...$(NC)"
-	@if [ -z "$(BATCH)" ] && [ -z "$(LIMIT)" ]; then \
-		$(VENV_PYTHON) -m src.main prepare-paper; \
-	else \
-		ARGS=""; \
-		if [ -n "$(BATCH)" ]; then ARGS="$$ARGS --batch-size $(BATCH)"; fi; \
-		if [ -n "$(LIMIT)" ]; then ARGS="$$ARGS --limit $(LIMIT)"; fi; \
-		$(VENV_PYTHON) -m src.main prepare-paper $$ARGS; \
-	fi
-
 
 .PHONY: prepare-labeling
 prepare-labeling: $(VENV_DIR)/bin/activate
@@ -113,6 +99,15 @@ prepare-labeling: $(VENV_DIR)/bin/activate
 import-labels: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🌱 Seeding labels and questions...$(NC)"
 	$(VENV_PYTHON) -m src.main import-labels
+
+# Prepare download_queue op basis van label
+.PHONY: prepare-download
+prepare-download: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)📥 Preparing download queue from label...$(NC)"
+	@if [ -z "$(L)" ]; then \
+		echo "$(RED)❌ Provide label id via L=<id>$(NC)"; exit 1; \
+	fi
+	$(VENV_PYTHON) -m src.main prepare-download $$L
 
 # Development commands
 .PHONY: test
