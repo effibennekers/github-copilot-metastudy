@@ -30,6 +30,7 @@ help:
 	@echo "  list-questions    - Toon alle questions met labelnaam"
 	@echo "  prepare-download  - Vul download_queue op basis van label"
 	@echo "  run-download      - Download tarballs uit download_queue (opt: N=limiet)"
+	@echo "  download-summary  - Toon aantallen en FAILED ids van download_queue"
 	@echo "  status            - Toon database statistieken"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
@@ -149,4 +150,9 @@ run-download: $(VENV_DIR)/bin/activate
 	else \
 		$(VENV_PYTHON) -m src.main run-download --limit $(N); \
 	fi
+
+.PHONY: download-summary
+download-summary: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)📬 Download queue summary...$(NC)"
+	@$(VENV_PYTHON) -m src.main download-summary
 

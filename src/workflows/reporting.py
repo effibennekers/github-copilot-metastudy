@@ -57,3 +57,49 @@ def list_questions() -> list[str]:
     out.append("Labels:")
     out.extend([f"l_id: {r['id']}, l_name: {r['name']}"] for r in lrows)
     return out
+
+
+def download_queue_summary() -> list[str]:
+    """Maak een samenvatting van de download_queue.
+
+    - Geeft aantallen voor PENDING en COMPLETED
+    - Geeft de arxiv_ids weer voor FAILED
+    """
+    db = PaperDatabase()
+    with db._connect() as conn:
+        cur = conn.cursor()
+
+        counts: dict[str, int] = {"PENDING": 0, "COMPLETED": 0, "FAILED": 0}
+        try:
+            cur.execute(
+                "SELECT download_status, COUNT(1) AS cnt FROM download_queue GROUP BY download_status"
+            )
+            for row in cur.fetchall():
+                status = row["download_status"]
+                cnt = int(row["cnt"]) if row["cnt"] is not None else 0
+                if status in counts:
+                    counts[status] = cnt
+        except Exception:
+            pass
+
+        failed_ids: list[str] = []
+        try:
+            cur.execute(
+                "SELECT arxiv_id FROM download_queue WHERE download_status='FAILED' ORDER BY created_at"
+            )
+            failed_ids = [r["arxiv_id"] for r in cur.fetchall()]
+        except Exception:
+            failed_ids = []
+
+    lines: list[str] = []
+    lines.append("Download Queue Summary:")
+    lines.append(f"  PENDING:   {counts['PENDING']}")
+    lines.append(f"  COMPLETED: {counts['COMPLETED']}")
+    lines.append(f"  FAILED:    {counts['FAILED']}")
+    lines.append("")
+    lines.append("Failed arxiv_ids:")
+    if failed_ids:
+        lines.extend([f"  - {aid}" for aid in failed_ids])
+    else:
+        lines.append("  (geen)")
+    return lines

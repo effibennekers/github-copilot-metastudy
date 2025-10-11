@@ -50,7 +50,7 @@ PROCESSING_CONFIG = {
 # Download Workflow Configuration
 DOWNLOAD_CONFIG = {
     # Maximaal aantal items om te downloaden in één run
-    "max_items": 50,
+    "max_items": 10,
     # Doelmap voor tarball downloads (relatief aan project root)
     "tarball_directory": "data/tarball",
 }

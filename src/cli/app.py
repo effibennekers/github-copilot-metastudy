@@ -10,7 +10,7 @@ from src.workflows.imports import (
     import_labels_questions,
 )
 from src.workflows.queues import run_prepare_metadata_labeling, run_prepare_paper_download
-from src.workflows.reporting import print_stats, list_questions
+from src.workflows.reporting import print_stats, list_questions, download_queue_summary
 from src.workflows.downloads import run_downloads
 
 
@@ -94,3 +94,9 @@ def main():
 def cli_run_download(limit: int | None):
     stats = run_downloads(limit=limit)
     click.echo(stats)
+
+
+@cli.command("download-summary")
+def cli_download_summary():
+    for line in download_queue_summary():
+        click.echo(line)
