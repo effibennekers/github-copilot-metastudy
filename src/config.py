@@ -96,17 +96,11 @@ LOGGING_CONFIG = {
     },
 }
 
-# LLM Configuration (voor kwaliteitscontrole en analyse)
-LLM_CONFIG = {
-    "model_name": "gemma3:12b-it-qat",
-    "ollama_api_base_url": "http://localhost:11434",
-    "temperature": 0.1,
+# LLM Configuration (gesplitst: general, ollama, vertex)
+LLM_GENERAL_CONFIG = {
     "batch_size": 2,
-    "format": "json",
-    "num_predict": 32,
-    "top_p": 0.9,
-    "top_k": 40,
-    "batch_delay_seconds": 10,
+    # Provider: 'ollama' of 'vertex'
+    "provider": "ollama",
     # Quality check prompt template
     "prompt_template": (
         "Je bent een expert in het controleren van academische papers in Markdown.\n\n"
@@ -129,6 +123,33 @@ LLM_CONFIG = {
     ),
 }
 
+LLM_OLLAMA_CONFIG = {
+    # Modelnaam voor Ollama backend
+    "model_name": "gemma3:12b-it-qat",
+    "api_base_url": "http://localhost:11434",
+    "temperature": 0.1,
+    "format": "json",
+    "num_predict": 32,
+    "top_p": 0.9,
+    "top_k": 40,
+}
+
+LLM_VERTEX_CONFIG = {
+    # Authenticatie via gcloud ADC (application-default credentials)
+    "project": "bennekers",
+    "location": "europe-west4",
+    # Modelnaam voor Vertex AI backend
+    "model_name": "gemini-2.5-flash",
+    # Optioneel: API versie configureren
+    "api_version": "v1",
+    # Tuning opties voor Vertex AI (GenerateContentConfig)
+    "temperature": 0.1,
+    "top_p": 0.9,
+    "top_k": 40,
+    # Equivalent aan max tokens voor output
+    "max_output_tokens": 1000,
+}
+
 # User Interface Configuration
 UI_CONFIG = {"show_progress_bars": True, "show_statistics": True}
 
@@ -139,6 +160,8 @@ __all__ = [
     "STORAGE_CONFIG",
     "PROCESSING_CONFIG",
     "LOGGING_CONFIG",
-    "LLM_CONFIG",
+    "LLM_GENERAL_CONFIG",
+    "LLM_OLLAMA_CONFIG",
+    "LLM_VERTEX_CONFIG",
     "UI_CONFIG",
 ]

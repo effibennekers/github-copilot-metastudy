@@ -13,18 +13,14 @@ from pathlib import Path
 
 # Import from package modules
 from src.database import PaperDatabase
-from src.arxiv_client import ArxivClient
 from src.llm import LLMChecker
-from src.conversion import pdf_naar_md
+from src.llm.llm_clients import LLMChatClient
 from src.config import (
-    SEARCH_CONFIG,
-    DATABASE_CONFIG,
-    STORAGE_CONFIG,
     LOGGING_CONFIG,
-    LLM_CONFIG,
-    UI_CONFIG,
+    LLM_GENERAL_CONFIG,
 )
 from importlib import import_module
+
 
 
 def print_stats():
@@ -131,6 +127,14 @@ def import_labels_questions() -> int:
 
 def run_labeling(labeling_jobs: int = 10) -> dict:
     """Verwerk labeling jobs rij-voor-rij vanuit labeling_queue.
+    
+    Dit is de synchrone wrapper die de asynchrone event loop start.
+    """
+    # Gebruik asyncio.run() om de asynchrone functie uit te voeren.
+    return asyncio.run(run_labeling_async(labeling_jobs))
+
+async def run_labeling_async(labeling_jobs: int = 10) -> dict:
+    """Verwerk labeling jobs rij-voor-rij vanuit labeling_queue.
 
     - Geen parameters nodig; neemt volgende job uit de queue totdat leeg.
     - LLM-calls zijn sequentieel per rij.
@@ -140,7 +144,6 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
     logger = logging.getLogger(__name__)
 
     database = PaperDatabase()
-    checker = LLMChecker()
 
     stats = {
         "processed": 0,
@@ -188,24 +191,30 @@ def run_labeling(labeling_jobs: int = 10) -> dict:
             }
         )
 
-    # Run LLM-calls async met bounded concurrency
-    async def _classify_all(jobs_input: list[dict]) -> list[dict]:
-        sem = asyncio.Semaphore(int(LLM_CONFIG.get("batch_size", 2)))
+    # async with LLMChatClient() zorgt voor de juiste initialisatie en sluiting!
+    async with LLMChatClient() as llm_client:
+        # Maak nu je checker aan en injecteer de actieve, geopende llm_client
+        # (Aanname: je checker gebruikt de LLMChatClient)
+        checker = LLMChecker(llm_client)
 
-        async def _one(j: dict) -> dict:
-            async with sem:
-                try:
-                    structured = await checker.classify_title_abstract_structured_async(
-                        question=j["prompt"], title=j["title"], abstract=j["abstract"]
-                    )
-                    return {"job": j, "structured": structured, "error": None}
-                except Exception as e:  # pragma: no cover
-                    return {"job": j, "structured": None, "error": str(e)}
+        # Run LLM-calls async met bounded concurrency
+        async def _classify_all(jobs_input: list[dict]) -> list[dict]:
+            sem = asyncio.Semaphore(int(LLM_GENERAL_CONFIG.get("batch_size", 2)))
 
-        tasks = [_one(j) for j in jobs_input]
-        return await asyncio.gather(*tasks)
+            async def _one(j: dict) -> dict:
+                async with sem:
+                    try:
+                        structured = await checker.classify_title_abstract_structured_async(
+                            question=j["prompt"], title=j["title"], abstract=j["abstract"]
+                        )
+                        return {"job": j, "structured": structured, "error": None}
+                    except Exception as e:  # pragma: no cover
+                        return {"job": j, "structured": None, "error": str(e)}
 
-    results: list[dict] = asyncio.run(_classify_all(jobs)) if jobs else []
+            tasks = [_one(j) for j in jobs_input]
+            return await asyncio.gather(*tasks)
+
+        results: list[dict] = await _classify_all(jobs) if jobs else []
 
     # Verwerk resultaten sequentieel (DB upserts)
     for res in results:

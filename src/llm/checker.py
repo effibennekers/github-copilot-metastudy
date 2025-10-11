@@ -10,22 +10,23 @@ from typing import Any, Dict, Optional, Tuple
 import re
 
 import ollama
+from src.llm.llm_clients import LLMChatClient
 
-from src.config import LLM_CONFIG
+from src.config import LLM_GENERAL_CONFIG, LLM_OLLAMA_CONFIG, LLM_VERTEX_CONFIG
 
 
 class LLMChecker:
-    def __init__(self):
-        self.ollama_url = LLM_CONFIG.get("ollama_api_base_url", "http://localhost:11434")
-        self.model_name = LLM_CONFIG.get("model_name", "llama3:8b-instruct")
+    def __init__(self, llm_client: LLMChatClient) -> None: 
+        provider = str(LLM_GENERAL_CONFIG.get("provider", "ollama")).strip().lower()
+        if provider == "vertex":
+            self.model_name = LLM_VERTEX_CONFIG.get("model_name", "gemini-2.5-flash")
+        else:
+            self.model_name = LLM_OLLAMA_CONFIG.get("model_name", "llama3:8b-instruct")
         self.logger = logging.getLogger(__name__)
-        # Reuse a single AsyncClient instance for all async calls
-        try:
-            self.async_client = ollama.AsyncClient(host=self.ollama_url)
-        except Exception:
-            self.async_client = None
-
-        self.logger.info(f"LLM Checker initialized: {self.ollama_url} with model {self.model_name}")
+        # Reuse a single AsyncClient instance voor gekozen provider
+        provider = str(LLM_GENERAL_CONFIG.get("provider", "ollama")).strip().lower()
+        self.async_client = llm_client
+        self.logger.info(f"LLM Checker initialized: provider={provider}, model={self.model_name}")
 
     def _build_messages(self, question: str, title: str, abstract: str) -> list[dict]:
         system_msg = (
@@ -46,18 +47,8 @@ class LLMChecker:
 
     async def _chat_async(self, messages: list[dict]) -> str:
         if self.async_client is None:
-            self.async_client = ollama.AsyncClient(host=self.ollama_url)
-        response = await self.async_client.chat(
-            model=self.model_name,
-            messages=messages,
-            options={
-                "temperature": LLM_CONFIG.get("temperature", 0.0),
-                "num_predict": LLM_CONFIG.get("num_predict", 32),
-                "format": LLM_CONFIG.get("format", "json"),
-                "top_p": LLM_CONFIG.get("top_p", 0.9),
-                "top_k": LLM_CONFIG.get("top_k", 40),
-            },
-        )
+            raise RuntimeError("AsyncClient is niet geïnitialiseerd")
+        response = await self.async_client.chat(messages=messages)
         return ((response or {}).get("message") or {}).get("content", "").strip()
 
     def _strip_code_fences(self, text: str) -> str:
