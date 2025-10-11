@@ -16,7 +16,7 @@ from src.config import LLM_GENERAL_CONFIG, LLM_OLLAMA_CONFIG, LLM_VERTEX_CONFIG
 
 
 class LLMChecker:
-    def __init__(self, llm_client: LLMChatClient) -> None: 
+    def __init__(self, llm_client: LLMChatClient) -> None:
         provider = str(LLM_GENERAL_CONFIG.get("provider", "ollama")).strip().lower()
         if provider == "vertex":
             self.model_name = LLM_VERTEX_CONFIG.get("model_name", "gemini-2.5-flash")

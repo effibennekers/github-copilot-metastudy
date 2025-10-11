@@ -139,13 +139,13 @@ class _VertexChatStrategy:
 
         # 1. Voorverwerking van de berichten om de 'system' rol te verwijderen
         for m in messages:
-            role = m.get('role', 'user').strip().lower()
-            content = m.get('content', '')
-            
-            if role == 'system':
+            role = m.get("role", "user").strip().lower()
+            content = m.get("content", "")
+
+            if role == "system":
                 # Verzamel alle system instructies
                 system_instructions.append(content)
-            elif role in ('user', 'model'):
+            elif role in ("user", "model"):
                 # Accepteer geldige rollen
                 final_messages.append(m)
             # Negeer andere ongeldige rollen
@@ -153,24 +153,20 @@ class _VertexChatStrategy:
         # 2. Voeg de system instructies toe aan het eerste 'user' bericht
         if system_instructions:
             full_system_prompt = "\n\n".join(system_instructions) + "\n\n"
-            
-            # Zoek het eerste 'user' bericht om de instructies aan toe te voegen
-            if final_messages and final_messages[0]['role'] == 'user':
-                final_messages[0]['content'] = full_system_prompt + final_messages[0]['content']
-            elif final_messages:
-                 # Als de conversatie begint met 'model' (ongebruikelijk), voeg dan de system instructie als eerste 'user' toe
-                 final_messages.insert(0, {'role': 'user', 'content': full_system_prompt})
-            else:
-                 # Als er alleen system berichten waren, maak een user message aan
-                 final_messages.append({'role': 'user', 'content': full_system_prompt})
 
+            # Zoek het eerste 'user' bericht om de instructies aan toe te voegen
+            if final_messages and final_messages[0]["role"] == "user":
+                final_messages[0]["content"] = full_system_prompt + final_messages[0]["content"]
+            elif final_messages:
+                # Als de conversatie begint met 'model' (ongebruikelijk), voeg dan de system instructie als eerste 'user' toe
+                final_messages.insert(0, {"role": "user", "content": full_system_prompt})
+            else:
+                # Als er alleen system berichten waren, maak een user message aan
+                final_messages.append({"role": "user", "content": full_system_prompt})
 
         # 3. Bouw de officiële Contents lijst (alleen 'user' en 'model' rollen)
         contents_list = [
-            genai_types.Content(
-                role=m['role'],
-                parts=[genai_types.Part(text=m['content'])]
-            )
+            genai_types.Content(role=m["role"], parts=[genai_types.Part(text=m["content"])])
             for m in final_messages
         ]
         response = await self._aclient.models.generate_content(

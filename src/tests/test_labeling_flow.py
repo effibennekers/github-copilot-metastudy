@@ -1,62 +1,70 @@
-import types
+import pytest
 
-from src.main import run_labeling
+from src.workflows.labeling import run_labeling
 
 
 class DummyDB:
-    def __init__(self, records, labeled_ids, question_row):
-        self._records = records
-        self._labeled_ids = set(labeled_ids)
-        self._question_row = question_row
-        self.upserts = []
+    jobs = [
+        {"metadata_id": "A", "question_id": 7},
+        {"metadata_id": "B", "question_id": 7},
+        {"metadata_id": "C", "question_id": 7},
+    ]
+    upserts = []
 
-    # repo API shims
+    def __init__(self):
+        pass
+
+    def pop_next_labeling_job(self):
+        return self.jobs.pop(0) if self.jobs else None
+
     def get_question_by_id(self, qid):
-        return self._question_row
+        return {"id": 7, "prompt": "Is about X?", "label_id": 3}
 
-    def get_metadata_ids_by_label(self, label_id):
-        return list(self._labeled_ids)
-
-    def iter_metadata_records(self, offset=0, limit=None, batch_size=500):
-        yield self._records
+    def get_title_and_abstract(self, metadata_id):
+        titles = {"A": "t1", "B": "t2", "C": "t3"}
+        return {"title": titles[metadata_id], "abstract": "a"}
 
     def upsert_metadata_label(self, metadata_id, label_id, confidence_score=None):
         self.upserts.append((metadata_id, label_id, confidence_score))
 
 
-class DummyLLM:
-    def __init__(self, positives):
-        self._positives = set(positives)
+class DummyChatClient:
+    async def __aenter__(self):
+        return self
 
-    def classify_record_to_metadata_label(self, question, metadata_record, label_id):
-        meta_id = metadata_record.get("id")
-        applicable = meta_id in self._positives
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class DummyChecker:
+    def __init__(self, _chat_client):
+        pass
+
+    async def classify_title_abstract_structured_async(self, question, title, abstract):
+        applicable = title == "t2"
         return {
-            "metadata_id": meta_id,
-            "label_id": label_id,
+            "answer_value": applicable,
             "confidence_score": 0.9 if applicable else None,
-            "created_at": "2024-01-01T00:00:00",
-            "updated_at": "2024-01-01T00:00:00",
-            "_applicable": applicable,
         }
 
 
-def test_run_labeling_smoke(monkeypatch):
-    # arrange: 3 records, 1 al gelabeld, 1 positief
-    records = [
-        {"id": "A", "title": "t1", "abstract": "a1"},
-        {"id": "B", "title": "t2", "abstract": "a2"},
-        {"id": "C", "title": "t3", "abstract": "a3"},
+def test_run_labeling_queue_smoke(monkeypatch):
+    import src.workflows.labeling as labeling_mod
+
+    DummyDB.jobs = [
+        {"metadata_id": "A", "question_id": 7},
+        {"metadata_id": "B", "question_id": 7},
+        {"metadata_id": "C", "question_id": 7},
     ]
-    already = ["A"]
-    question_row = {"id": 7, "prompt": "Is about X?", "label_id": 3}
-    db = DummyDB(records=records, labeled_ids=already, question_row=question_row)
-    llm = DummyLLM(positives=["B"])  # alleen B wordt positief
+    DummyDB.upserts = []
 
-    # act
-    stats = run_labeling(7, db=db, llm=llm, limit=None, offset=0, batch_size=10)
+    monkeypatch.setattr(labeling_mod, "PaperDatabase", DummyDB)
+    monkeypatch.setattr(labeling_mod, "LLMChatClient", DummyChatClient)
+    monkeypatch.setattr(labeling_mod, "LLMChecker", DummyChecker)
 
-    # assert
-    assert stats["skipped_existing"] == 1
+    stats = run_labeling(labeling_jobs=3)
+
+    assert stats["errors"] == 0
+    assert stats["skipped_missing"] == 0
     assert stats["labeled"] == 1
-    assert db.upserts == [("B", 3, 0.9)]
+    assert DummyDB.upserts == [("B", 3, 0.9)]

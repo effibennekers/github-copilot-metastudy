@@ -152,21 +152,42 @@ class LabelsRepository(BaseDatabase):
             return [row["metadata_id"] for row in cur.fetchall()]
 
     def list_questions(self) -> List[dict]:
-        """Retourneer lijst van questions inclusief labelnaam.
+        """Retourneer lijst van questions inclusief label-id en label-naam.
 
-        Keys: id, name, label_name
+        Keys: id, name, label_id, label_name
         """
         with self._connect() as conn:
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT q.id, q.name, l.name AS label_name
+                SELECT q.id, q.name, l.id AS label_id, l.name AS label_name
                 FROM questions q
                 JOIN labels l ON q.label_id = l.id
                 ORDER BY l.name, q.name, q.id
                 """
             )
             return [
-                {"id": int(row["id"]), "name": row["name"], "label_name": row["label_name"]}
+                {
+                    "id": int(row["id"]),
+                    "name": row["name"],
+                    "label_id": int(row["label_id"]),
+                    "label_name": row["label_name"],
+                }
                 for row in cur.fetchall()
             ]
+
+    def list_labels(self) -> List[dict]:
+        """Retourneer lijst van labels.
+
+        Keys: id, name
+        """
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id, name
+                FROM labels
+                ORDER BY name, id
+                """
+            )
+            return [{"id": int(row["id"]), "name": row["name"]} for row in cur.fetchall()]

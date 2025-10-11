@@ -28,7 +28,8 @@ help:
 	@echo "  run-labeling      - Verwerk labeling_queue (default: JOBS=10)"
 	@echo "  prepare-labeling  - Vul labeling_queue (default: date_after=2025-09-01)"
 	@echo "  list-questions    - Toon alle questions met labelnaam"
-	@echo "  prepare-download  - Maak papers aan op basis van metadata"
+	@echo "  prepare-download  - Vul download_queue op basis van label"
+	@echo "  prepare-paper     - Maak paper records aan op basis van metadata"
 	@echo "  status            - Toon database statistieken"
 	@echo ""
 	@echo "$(GREEN)Development Commands:$(NC)"
@@ -72,36 +73,30 @@ $(VENV_DIR)/bin/activate: requirements.txt
 .PHONY: status
 status: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📊 Checking database status...$(NC)"
-	$(VENV_PYTHON) -c "from src.main import print_stats; print_stats()"
+	$(VENV_PYTHON) -m src.main stats
 
 .PHONY: import-metadata
 import-metadata: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)📥 Importing metadata...$(NC)"
 	@if [ -z "$(MAX)" ] && [ -z "$(BATCH)" ]; then \
-		$(VENV_PYTHON) -c "from src.main import run_metadata_import; run_metadata_import()"; \
+		$(VENV_PYTHON) -m src.main import-metadata; \
 	else \
 		ARGS=""; \
-		if [ -n "$(MAX)" ]; then ARGS="max_records=int('$(MAX)')"; fi; \
-		if [ -n "$(BATCH)" ]; then \
-		  if [ -n "$$ARGS" ]; then ARGS="$$ARGS, "; fi; \
-		  ARGS="$$ARGS batch_size=int('$(BATCH)')"; \
-		fi; \
-		$(VENV_PYTHON) -c "from src.main import run_metadata_import; run_metadata_import($$ARGS)"; \
+		if [ -n "$(MAX)" ]; then ARGS="$$ARGS --max-records $(MAX)"; fi; \
+		if [ -n "$(BATCH)" ]; then ARGS="$$ARGS --batch-size $(BATCH)"; fi; \
+		$(VENV_PYTHON) -m src.main import-metadata $$ARGS; \
 	fi
 
 .PHONY: prepare-download
-prepare-download: $(VENV_DIR)/bin/activate
+prepare-paper: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🧩 Preparing paper records from metadata...$(NC)"
 	@if [ -z "$(BATCH)" ] && [ -z "$(LIMIT)" ]; then \
-		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation()"; \
+		$(VENV_PYTHON) -m src.main prepare-paper; \
 	else \
 		ARGS=""; \
-		if [ -n "$(BATCH)" ]; then ARGS="batch_size=int('$(BATCH)')"; fi; \
-		if [ -n "$(LIMIT)" ]; then \
-		  if [ -n "$$ARGS" ]; then ARGS="$$ARGS, "; fi; \
-		  ARGS="$$ARGS limit=int('$(LIMIT)')"; \
-		fi; \
-		$(VENV_PYTHON) -c "from src.main import run_paper_preparation; run_paper_preparation($$ARGS)"; \
+		if [ -n "$(BATCH)" ]; then ARGS="$$ARGS --batch-size $(BATCH)"; fi; \
+		if [ -n "$(LIMIT)" ]; then ARGS="$$ARGS --limit $(LIMIT)"; fi; \
+		$(VENV_PYTHON) -m src.main prepare-paper $$ARGS; \
 	fi
 
 
@@ -112,16 +107,12 @@ prepare-labeling: $(VENV_DIR)/bin/activate
 		echo "$(RED)❌ Provide question id via Q=<id>$(NC)"; exit 1; \
 	fi
 	@if [ -z "$(DATE)" ]; then DATE=2025-09-01; else DATE=$(DATE); fi; \
-	$(VENV_PYTHON) -c "from src.main import run_prepare_metadata_labeling; print(run_prepare_metadata_labeling(question_id=int('$(Q)'), date_after='$$DATE'))"
+	$(VENV_PYTHON) -m src.main prepare-labeling $$Q --date-after $$DATE
 
 .PHONY: import-labels
 import-labels: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🌱 Seeding labels and questions...$(NC)"
-	@if [ -z "$(LABELS)" ]; then \
-		$(VENV_PYTHON) -c "from src.main import import_labels_questions; import_labels_questions()"; \
-	else \
-		$(VENV_PYTHON) -c "from src.main import import_labels_questions; import_labels_questions(labels_path='$(LABELS)')"; \
-	fi
+	$(VENV_PYTHON) -m src.main import-labels
 
 # Development commands
 .PHONY: test
@@ -144,13 +135,13 @@ format: $(VENV_DIR)/bin/activate
 run-labeling: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)🏷️  Running labeling jobs...$(NC)"
 	@if [ -z "$(JOBS)" ]; then JOBS=10; else JOBS=$(JOBS); fi; \
-	$(VENV_PYTHON) -c "from src.main import run_labeling; import json; print(json.dumps(run_labeling(labeling_jobs=int('$$JOBS')), ensure_ascii=False))"
+	$(VENV_PYTHON) -m src.main label --jobs $$JOBS
 
 
 .PHONY: list-questions
 list-questions: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)❓ Listing questions...$(NC)"
-	@$(VENV_PYTHON) -c "from src.main import list_questions; print('\n'.join(list_questions()))"
+	@$(VENV_PYTHON) -m src.main list-questions
 
 .PHONY: install-ollama
 install-ollama:
