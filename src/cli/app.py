@@ -11,6 +11,7 @@ from src.workflows.imports import (
 )
 from src.workflows.queues import run_prepare_metadata_labeling, run_prepare_paper_download
 from src.workflows.reporting import print_stats, list_questions
+from src.workflows.downloads import run_downloads
 
 
 @click.group()
@@ -86,3 +87,10 @@ def cli_stats():
 
 def main():
     cli()
+
+
+@cli.command("run-download")
+@click.option("--limit", type=int, default=None, help="Max aantal downloads")
+def cli_run_download(limit: int | None):
+    stats = run_downloads(limit=limit)
+    click.echo(stats)

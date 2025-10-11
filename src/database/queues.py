@@ -192,3 +192,37 @@ class QueuesRepository(BaseDatabase):
             )
             conn.commit()
             return {"metadata_id": metadata_id, "question_id": question_id}
+
+    def get_pending_downloads(self, limit: int) -> list[str]:
+        """Haal tot 'limit' PENDING downloads op uit download_queue."""
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT arxiv_id
+                FROM download_queue
+                WHERE download_status = 'PENDING'
+                ORDER BY created_at
+                LIMIT %s
+                """,
+                (int(limit),),
+            )
+            rows = cur.fetchall()
+            return [r["arxiv_id"] for r in rows]
+
+    def set_download_status(self, arxiv_id: str, status: str) -> None:
+        """Update download_status voor een item in download_queue."""
+        if status not in ("PENDING", "COMPLETED", "FAILED"):
+            raise ValueError("status moet 'PENDING','COMPLETED' of 'FAILED' zijn")
+        with self._connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE download_queue
+                SET download_status = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE arxiv_id = %s
+                """,
+                (status, arxiv_id),
+            )
+            conn.commit()

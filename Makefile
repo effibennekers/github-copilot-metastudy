@@ -138,3 +138,12 @@ list-questions: $(VENV_DIR)/bin/activate
 	@echo "$(BLUE)❓ Listing questions...$(NC)"
 	@$(VENV_PYTHON) -m src.main list-questions
 
+.PHONY: run-download
+run-download: $(VENV_DIR)/bin/activate
+	@echo "$(BLUE)⬇️  Running downloads from download_queue...$(NC)"
+	@if [ -z "$(N)" ]; then \
+		$(VENV_PYTHON) -m src.main run-download; \
+	else \
+		$(VENV_PYTHON) -m src.main run-download --limit $(N); \
+	fi
+

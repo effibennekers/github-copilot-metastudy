@@ -47,6 +47,14 @@ PROCESSING_CONFIG = {
     "download_timeout_seconds": 60,
 }
 
+# Download Workflow Configuration
+DOWNLOAD_CONFIG = {
+    # Maximaal aantal items om te downloaden in één run
+    "max_items": 50,
+    # Doelmap voor tarball downloads (relatief aan project root)
+    "tarball_directory": "data/tarball",
+}
+
 # ==============================================================================
 # LOGGING CONFIGURATION
 # Python's standaard logging configuratie (logging.config.dictConfig format)
@@ -159,6 +167,7 @@ __all__ = [
     "DATABASE_CONFIG",
     "STORAGE_CONFIG",
     "PROCESSING_CONFIG",
+    "DOWNLOAD_CONFIG",
     "LOGGING_CONFIG",
     "LLM_GENERAL_CONFIG",
     "LLM_OLLAMA_CONFIG",
