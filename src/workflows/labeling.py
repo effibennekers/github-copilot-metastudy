@@ -19,75 +19,109 @@ async def _run_labeling_async(labeling_jobs: int = 10) -> dict:
         "🔖 Start labeling vanuit labeling_queue (rij-voor-rij), max jobs=%s", labeling_jobs
     )
 
-    jobs: list[dict] = []
-    for _ in range(int(labeling_jobs)):
-        job = database.pop_next_labeling_job()
-        if not job:
-            break
-        metadata_id = job.get("metadata_id")
-        question_id = job.get("question_id")
-        if not metadata_id or not isinstance(question_id, int):
-            stats["skipped_missing"] += 1
-            continue
-        qrow = database.get_question_by_id(int(question_id))
-        if not qrow:
-            stats["skipped_missing"] += 1
-            continue
-        prompt: str = qrow["prompt"]
-        label_id: int = int(qrow["label_id"])  # type: ignore[assignment]
-        ta = database.get_title_and_abstract(str(metadata_id))
-        if not ta:
-            stats["skipped_missing"] += 1
-            continue
-        jobs.append(
-            {
-                "metadata_id": metadata_id,
-                "question_id": question_id,
-                "label_id": label_id,
-                "prompt": prompt,
-                "title": ta["title"],
-                "abstract": ta["abstract"],
-            }
-        )
+    # Jobs worden downstream non-blocking opgehaald en verrijkt
 
     async with LLMChatClient() as llm_client:
         checker = LLMChecker(llm_client)
 
-        async def _classify_all(jobs_input: list[dict]) -> list[dict]:
-            sem = asyncio.Semaphore(int(LLM_GENERAL_CONFIG.get("batch_size", 2)))
+        # Producer: haal jobs uit de queue en verrijk ze non-blocking
+        async def fetch_jobs_from_queue(limit: int) -> list[dict]:
+            fetched: list[dict] = []
+            for _ in range(int(limit)):
+                job = await asyncio.to_thread(database.pop_next_labeling_job)
+                if not job:
+                    break
+                fetched.append(job)
+            return fetched
 
-            async def _one(j: dict) -> dict:
-                async with sem:
+        async def enrich_stream(jobs_input: list[dict]):
+            sem_db = asyncio.Semaphore(int(LLM_GENERAL_CONFIG.get("batch_size", 2)))
+
+            async def _enrich(j: dict):
+                async with sem_db:
+                    metadata_id = j.get("metadata_id")
+                    question_id = j.get("question_id")
+                    if not metadata_id or not isinstance(question_id, int):
+                        stats["skipped_missing"] += 1
+                        return None
+                    qrow = await asyncio.to_thread(database.get_question_by_id, int(question_id))
+                    if not qrow:
+                        stats["skipped_missing"] += 1
+                        return None
+                    ta = await asyncio.to_thread(database.get_title_and_abstract, str(metadata_id))
+                    if not ta:
+                        stats["skipped_missing"] += 1
+                        return None
+                    return {
+                        "metadata_id": metadata_id,
+                        "question_id": question_id,
+                        "label_id": int(qrow["label_id"]),
+                        "prompt": qrow["prompt"],
+                        "title": ta["title"],
+                        "abstract": ta["abstract"],
+                    }
+
+            tasks = [asyncio.create_task(_enrich(j)) for j in jobs_input]
+            for fut in asyncio.as_completed(tasks):
+                res = await fut
+                if res:
+                    yield res
+
+        # Consumer: classificeer verrijkte jobs en verwerk direct resultaten
+        sem_llm = asyncio.Semaphore(int(LLM_GENERAL_CONFIG.get("batch_size", 2)))
+        enriched_queue: asyncio.Queue = asyncio.Queue()
+
+        async def producer():
+            raw_jobs = await fetch_jobs_from_queue(labeling_jobs)
+            async for ej in enrich_stream(raw_jobs):
+                await enriched_queue.put(ej)
+            await enriched_queue.put(None)  # sentinel
+
+        async def consumer():
+            classify_tasks: set[asyncio.Task] = set()
+
+            async def classify_and_handle(j: dict):
+                async with sem_llm:
                     try:
                         structured = await checker.classify_title_abstract_structured_async(
                             question=j["prompt"], title=j["title"], abstract=j["abstract"]
                         )
-                        return {"job": j, "structured": structured, "error": None}
+                        error = None
                     except Exception as e:  # pragma: no cover
-                        return {"job": j, "structured": None, "error": str(e)}
+                        structured, error = None, str(e)
 
-            tasks = [_one(j) for j in jobs_input]
-            return await asyncio.gather(*tasks)
+                if error or not isinstance(structured, dict):
+                    stats["errors"] += 1
+                    return
 
-        results: list[dict] = await _classify_all(jobs) if jobs else []
+                stats["processed"] += 1
+                counter = f"{stats['processed']:03d}"
+                if not bool(structured.get("answer_value")):
+                    logging.getLogger(__name__).info("%s ❌ %s", counter, j["title"])
+                    return
 
-    for res in results:
-        j = res["job"]
-        if res.get("error") or not isinstance(res.get("structured"), dict):
-            stats["errors"] += 1
-            continue
-        structured = res["structured"]
-        stats["processed"] += 1
-        counter = f"{stats['processed']:03d}"
-        if not bool(structured.get("answer_value")):
-            logging.getLogger(__name__).info("%s ❌ %s", counter, j["title"])
-            continue
-        confidence = structured.get("confidence_score")
-        database.upsert_metadata_label(
-            metadata_id=j["metadata_id"], label_id=j["label_id"], confidence_score=confidence
-        )
-        stats["labeled"] += 1
-        logging.getLogger(__name__).info("%s ✅ %s", counter, j["title"])
+                confidence = structured.get("confidence_score")
+                await asyncio.to_thread(
+                    database.upsert_metadata_label,
+                    j["metadata_id"],
+                    j["label_id"],
+                    confidence,
+                )
+                stats["labeled"] += 1
+                logging.getLogger(__name__).info("%s ✅ %s", counter, j["title"])
+
+            while True:
+                item = await enriched_queue.get()
+                if item is None:
+                    break
+                t = asyncio.create_task(classify_and_handle(item))
+                classify_tasks.add(t)
+                t.add_done_callback(lambda _t: classify_tasks.discard(_t))
+
+            if classify_tasks:
+                await asyncio.gather(*classify_tasks)
+
+        await asyncio.gather(producer(), consumer())
 
     logging.getLogger(__name__).info(
         "✅ Labeling klaar: processed=%s, labeled=%s, skipped_missing=%s, errors=%s",
