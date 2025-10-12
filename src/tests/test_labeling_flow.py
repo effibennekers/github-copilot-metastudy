@@ -59,7 +59,7 @@ def test_run_labeling_queue_smoke(monkeypatch):
     DummyDB.upserts = []
 
     monkeypatch.setattr(labeling_mod, "PaperDatabase", DummyDB)
-    monkeypatch.setattr(labeling_mod, "LLMChatClient", DummyChatClient)
+    monkeypatch.setattr(labeling_mod, "LLMClient", DummyChatClient)
     monkeypatch.setattr(labeling_mod, "LLMChecker", DummyChecker)
 
     stats = run_labeling(labeling_jobs=3)

@@ -4,8 +4,7 @@ import time
 
 from src.database import PaperDatabase
 from src.llm import LLMChecker
-from src.llm.llm_clients import LLMChatClient
-from src.config import LLM_GENERAL_CONFIG
+from src.llm.llm_clients import LLMClient
 
 
 async def _run_labeling_async(labeling_jobs: int = 10) -> dict:
@@ -21,7 +20,7 @@ async def _run_labeling_async(labeling_jobs: int = 10) -> dict:
 
     # Jobs worden downstream non-blocking opgehaald en verrijkt
 
-    async with LLMChatClient() as llm_client:
+    async with LLMClient() as llm_client:
         checker = LLMChecker(llm_client)
 
         # Producer: haal jobs uit de queue en verrijk ze non-blocking
@@ -35,31 +34,29 @@ async def _run_labeling_async(labeling_jobs: int = 10) -> dict:
             return fetched
 
         async def enrich_stream(jobs_input: list[dict]):
-            sem_db = asyncio.Semaphore(int(LLM_GENERAL_CONFIG.get("batch_size", 2)))
 
             async def _enrich(j: dict):
-                async with sem_db:
-                    metadata_id = j.get("metadata_id")
-                    question_id = j.get("question_id")
-                    if not metadata_id or not isinstance(question_id, int):
-                        stats["skipped_missing"] += 1
-                        return None
-                    qrow = await asyncio.to_thread(database.get_question_by_id, int(question_id))
-                    if not qrow:
-                        stats["skipped_missing"] += 1
-                        return None
-                    ta = await asyncio.to_thread(database.get_title_and_abstract, str(metadata_id))
-                    if not ta:
-                        stats["skipped_missing"] += 1
-                        return None
-                    return {
-                        "metadata_id": metadata_id,
-                        "question_id": question_id,
-                        "label_id": int(qrow["label_id"]),
-                        "prompt": qrow["prompt"],
-                        "title": ta["title"],
-                        "abstract": ta["abstract"],
-                    }
+                metadata_id = j.get("metadata_id")
+                question_id = j.get("question_id")
+                if not metadata_id or not isinstance(question_id, int):
+                    stats["skipped_missing"] += 1
+                    return None
+                qrow = await asyncio.to_thread(database.get_question_by_id, int(question_id))
+                if not qrow:
+                    stats["skipped_missing"] += 1
+                    return None
+                ta = await asyncio.to_thread(database.get_title_and_abstract, str(metadata_id))
+                if not ta:
+                    stats["skipped_missing"] += 1
+                    return None
+                return {
+                    "metadata_id": metadata_id,
+                    "question_id": question_id,
+                    "label_id": int(qrow["label_id"]),
+                    "prompt": qrow["prompt"],
+                    "title": ta["title"],
+                    "abstract": ta["abstract"],
+                }
 
             tasks = [asyncio.create_task(_enrich(j)) for j in jobs_input]
             for fut in asyncio.as_completed(tasks):
@@ -68,7 +65,6 @@ async def _run_labeling_async(labeling_jobs: int = 10) -> dict:
                     yield res
 
         # Consumer: classificeer verrijkte jobs en verwerk direct resultaten
-        sem_llm = asyncio.Semaphore(int(LLM_GENERAL_CONFIG.get("batch_size", 2)))
         enriched_queue: asyncio.Queue = asyncio.Queue()
 
         async def producer():
@@ -81,14 +77,13 @@ async def _run_labeling_async(labeling_jobs: int = 10) -> dict:
             classify_tasks: set[asyncio.Task] = set()
 
             async def classify_and_handle(j: dict):
-                async with sem_llm:
-                    try:
-                        structured = await checker.classify_title_abstract_structured_async(
-                            question=j["prompt"], title=j["title"], abstract=j["abstract"]
-                        )
-                        error = None
-                    except Exception as e:  # pragma: no cover
-                        structured, error = None, str(e)
+                try:
+                    structured = await checker.classify_title_abstract_structured_async(
+                        question=j["prompt"], title=j["title"], abstract=j["abstract"]
+                    )
+                    error = None
+                except Exception as e:  # pragma: no cover
+                    structured, error = None, str(e)
 
                 if error or not isinstance(structured, dict):
                     stats["errors"] += 1

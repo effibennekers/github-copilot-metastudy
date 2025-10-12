@@ -108,27 +108,7 @@ LOGGING_CONFIG = {
 LLM_GENERAL_CONFIG = {
     "batch_size": 2,
     # Provider: 'ollama' of 'vertex'
-    "provider": "ollama",
-    # Quality check prompt template
-    "prompt_template": (
-        "Je bent een expert in het controleren van academische papers in Markdown.\n\n"
-        "Controleer de volgende Markdown tekst op:\n"
-        "1. Verkeerde koppen (# ## ###) - zorg dat ze logisch genest zijn\n"
-        "2. Gebroken tabellen - herstel tabel formatting\n"
-        "3. Foute lijstopmaak - corrigeer genummerde en bullet lists\n"
-        "4. Referentie formatting - zorg voor correcte [1], [2] notatie\n"
-        '5. Figuur/tabel captions - herstel "Figure 1:", "Table 2:" formatting\n'
-        "6. Paragraaf structuur - voeg ontbrekende line breaks toe\n"
-        "7. Code blocks - zorg voor correcte ``` formatting\n"
-        "8. Mathematical formulas - behoud LaTeX notatie waar mogelijk\n\n"
-        "BELANGRIJKE REGELS:\n"
-        "- Behoud ALLE originele inhoud en betekenis\n"
-        "- Verander GEEN wetenschappelijke termen of concepten\n"
-        "- Voeg GEEN nieuwe informatie toe\n"
-        "- Focus alleen op Markdown opmaak verbetering\n"
-        "- Als de tekst al goed geformatteerd is, verander dan niets\n\n"
-        "Antwoord ALLEEN met de gecorrigeerde Markdown, geen extra uitleg of commentaar."
-    ),
+    "provider": "vertex",
 }
 
 LLM_OLLAMA_CONFIG = {
@@ -137,9 +117,13 @@ LLM_OLLAMA_CONFIG = {
     "api_base_url": "http://localhost:11434",
     "temperature": 0.1,
     "format": "json",
-    "num_predict": 32,
+    "num_predict": 4096,
     "top_p": 0.9,
     "top_k": 40,
+    # Concurrency limiet voor Ollama requests (globaal per proces)
+    "batch_size": 2,
+    # Maximum aantal karakters per chunk voor de LLM converter
+    "max_chars_per_chunk": 12000,
 }
 
 LLM_VERTEX_CONFIG = {
@@ -155,7 +139,11 @@ LLM_VERTEX_CONFIG = {
     "top_p": 0.9,
     "top_k": 40,
     # Equivalent aan max tokens voor output
-    "max_output_tokens": 1000,
+    "max_output_tokens": 4096,
+    # Concurrency limiet voor Vertex requests (globaal per proces)
+    "batch_size": 4,
+    # Maximum aantal karakters per chunk voor de LLM converter
+    "max_chars_per_chunk": 20000,
 }
 
 # User Interface Configuration
