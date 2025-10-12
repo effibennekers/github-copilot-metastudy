@@ -31,7 +31,8 @@ data/
 *.pdf
 *.md
 !README.md
-!IMPLEMENTATION_PLAN.md
+!GOAL.md
+!EXTRACTION.md
 
 # Database files
 *.db
