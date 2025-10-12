@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, Callable, Awaitable
 import asyncio
 
 from src.config import LLM_GENERAL_CONFIG, LLM_OLLAMA_CONFIG, LLM_VERTEX_CONFIG
@@ -70,7 +70,7 @@ class LLMClient:
             raise RuntimeError(
                 "LLMClient moet worden gebruikt met 'async with' om te initialiseren"
             )
-        return await self._run_with_limit(self._chat_strategy.chat(messages))
+        return await self._run_with_limit(lambda: self._chat_strategy.chat(messages))
 
     async def generate(self, prompt: str) -> dict:
         """Voert de generate-aanroep uit via de geselecteerde strategie (prompt-only)."""
@@ -78,26 +78,29 @@ class LLMClient:
             raise RuntimeError(
                 "LLMClient moet worden gebruikt met 'async with' om te initialiseren"
             )
-        return await self._run_with_limit(self._generate_strategy.generate(prompt))
+        return await self._run_with_limit(lambda: self._generate_strategy.generate(prompt))
 
-    async def _run_with_limit(self, awaitable: Any) -> Any:
+    async def _run_with_limit(self, call: Callable[[], Awaitable[Any]]) -> Any:
         if self._semaphore is None:
-            return await awaitable
+            return await call()
         await self._semaphore.acquire()
         try:
-            return await awaitable
+            return await call()
         finally:
             self._semaphore.release()
 
 
 class _GlobalSemaphoreRegistry:
-    _semaphores: dict[str, asyncio.Semaphore] = {}
+    # key: (provider, loop_id) -> semaphore
+    _semaphores: dict[tuple[str, int], asyncio.Semaphore] = {}
 
     @classmethod
     def get_semaphore(cls, provider: str, capacity: int) -> asyncio.Semaphore:
-        sem = cls._semaphores.get(provider)
+        loop = asyncio.get_running_loop()
+        key = (provider, id(loop))
+        sem = cls._semaphores.get(key)
         if sem is None or (hasattr(sem, "_value") and sem._value != capacity):  # type: ignore[attr-defined]
-            cls._semaphores[provider] = asyncio.Semaphore(int(max(1, capacity)))
-        return cls._semaphores[provider]
+            cls._semaphores[key] = asyncio.Semaphore(int(max(1, capacity)))
+        return cls._semaphores[key]
 
  
