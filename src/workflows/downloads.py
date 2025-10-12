@@ -7,7 +7,7 @@ from pathlib import Path
 
 from src.config import DOWNLOAD_CONFIG
 from src.database import PaperDatabase
-from src.arxiv_client import ArxivClient
+from src.arxiv import ArxivClient
 
 
 def run_downloads(limit: int | None = None) -> dict:

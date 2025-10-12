@@ -4,7 +4,7 @@ Onderzoek naar AI-ondersteunde programmering via arXiv papers
 """
 
 from src.database import PaperDatabase
-from src.arxiv_client import ArxivClient
+from src.arxiv import ArxivClient
 from src.llm import LLMChecker
 
 __version__ = "1.0.0"
